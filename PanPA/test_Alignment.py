@@ -1,4 +1,4 @@
-from ProteinAligner.alignment_test import AlignmentTest
+from PanPA.alignment_test import AlignmentTest
 
 
 def test_alignment():

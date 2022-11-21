@@ -1,8 +1,8 @@
 # distutils: language=c++
 
 import logging
-from ProteinAligner.Node cimport Node
-from ProteinAligner.Graph cimport Graph
+from PanPA.Node cimport Node
+from PanPA.Graph cimport Graph
 
 """
 The idea here is simple

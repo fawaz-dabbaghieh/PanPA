@@ -1,12 +1,10 @@
 # distutils: language=c++
-
-
 import os
-from ProteinAligner.Graph cimport Graph
-from ProteinAligner.constants import all_linear_sub_matrices
+from PanPA.Graph cimport Graph
+from PanPA.constants import all_linear_sub_matrices
 from libcpp.vector cimport vector
 from libcpp.string cimport string
-from ProteinAligner.graph_smith_waterman cimport align_to_graph_sw
+from PanPA.graph_smith_waterman cimport align_to_graph_sw
 
 
 class AlignmentTest:

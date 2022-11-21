@@ -1,5 +1,5 @@
-from ProteinAligner.constants import translation_table
-import ProteinAligner.reverse_complement_fast.reverse_complement as reverse
+from PanPA.constants import translation_table
+import PanPA.reverse_complement_fast.reverse_complement as reverse
 
 """
 Some notes from the Biopython library
@@ -8,10 +8,58 @@ or a stop codon.  These are translated as "X".  Any invalid codon
 (e.g. "TA?" or "T-A") will throw an error.
 """
 
-
 def translate(seq, seq_name):
     """
     Takes a DNA sequence and it's id and returns a dictionary with the 6 different translations
+    adds the character '[' as a stop codon. The reason is because [ is the character after Z
+
+    :param seq: dna sequence
+    :param seq_name: the dna sequence id
+    :return to_return: a dictionary of the 6 different translations
+    """
+
+    def inner_loop(seq):
+        translations = ["", "", ""]
+        cdef int n, i, j
+        n = len(seq)
+        for i in range(0, n - n % 3, 3):
+            # a simple way to check if I hit a stop codon in one of the frames
+            # so I stop that and continue the other frames
+            for j in range(3):
+                # the codon interval in the sequence
+                start = i + j
+                end = i + j + 3
+                if end > n:  # end of sequence
+                    continue
+                codon = seq[start:end].upper()
+
+                if "N" in codon:
+                    translations[j] += "X"  # we don't know what amino acid
+                elif translation_table[codon] == "_":  # stop codon
+                    translations[j] += '['
+                elif codon not in translation_table:
+                    print("Warning! Codon {} not found in the translation table and X is used for this codon".format(codon))
+                    translations[j] += "X"
+                else:
+                    translations[j] += translation_table[codon]
+        return translations
+
+    if not seq:
+        return "", "", 0
+
+    reverse_seq = reverse(seq)
+    reading_frames = inner_loop(seq)
+    reading_frames_reverse = inner_loop(reverse_seq)
+    reading_frames = {1: reading_frames[0], 2: reading_frames[1], 3: reading_frames[2],
+                      -1: reading_frames_reverse[0], -2: reading_frames_reverse[1], -3: reading_frames_reverse[2]}
+
+    return reading_frames
+
+
+def translate_no_stop(seq, seq_name):
+    """
+    Takes a DNA sequence and it's id and returns a dictionary with the 6 different translations
+    but it stops once it hits a stop codon
 
     :param seq: dna sequence
     :param seq_name: the dna sequence id

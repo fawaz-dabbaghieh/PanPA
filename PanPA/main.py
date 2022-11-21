@@ -3,7 +3,7 @@
 import sys
 import argparse
 import logging
-from ProteinAligner._main import _main
+from PanPA._main import _main
 
 """
 1: Build Graph and Index
@@ -114,11 +114,17 @@ def main():
     aligning.add_argument("-r", "--seqs", metavar="SEQS", dest="in_seqs", default=None,
                           type=str, help="The input sequences to align in fasta format")
 
+    aligning.add_argument("--dna", dest="is_dna", default=False, action="store_true",
+                          help="Give this flag if the query sequences are DNA and not AA")
+
     aligning.add_argument("-c", "--cores", metavar="CORES", dest="n_cores", default=1,
                           type=int, help="Numbers of cores to use for aligning")
 
     aligning.add_argument("--sub_matrix", dest="sub_matrix", default="blosum62",
                                  type=str, help="Substitution matrix to use for alignment, default: blosum62")
+
+    aligning.add_argument("--sub_matrix_list", dest="sub_matrix_list", default=False, action="store_true",
+                          help="When given, a list of possible substitution matrices will be given")
 
     aligning.add_argument("-o", "--out_gaf", metavar="GAF", dest="out_gaf", default="alignments.gaf",
                           type=str, help="Output alignments file path")
@@ -133,6 +139,11 @@ def main():
                           help="How many graphs can each seed from the query sequence have hits to, default: 3")
 
     args = parser.parse_args()
+
+    if len(sys.argv) == 1:
+        print("You did not provide any arguments\n"
+              "Try to use -h or --help for help\n")
+        sys.exit()
 
     log_file = args.log_file
 

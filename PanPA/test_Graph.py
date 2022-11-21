@@ -1,4 +1,4 @@
-from ProteinAligner.graph_test import GraphTest
+from PanPA.graph_test import GraphTest
 
 
 def test_graph_construction(gfa_file="testing/example_seqs.gfa", paths=True):

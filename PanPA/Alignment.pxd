@@ -1,4 +1,4 @@
-from ProteinAligner.Graph cimport Graph
+from PanPA.Graph cimport Graph
 
 
 cdef class Alignment:

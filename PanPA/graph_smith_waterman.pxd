@@ -1,4 +1,4 @@
-from ProteinAligner.Graph cimport Graph
+from PanPA.Graph cimport Graph
 from libcpp.vector cimport vector
 from libcpp.string cimport string
 

@@ -1,8 +1,8 @@
 # distutils: language=c++
 
 import time
-from ProteinAligner.Graph cimport Graph
-from ProteinAligner.constants import all_linear_sub_matrices
+from PanPA.Graph cimport Graph
+from PanPA.constants import all_linear_sub_matrices
 from libcpp.vector cimport vector
 import logging
 import sys

@@ -1,4 +1,4 @@
-from ProteinAligner.node_test import NodeTest
+from PanPA.node_test import NodeTest
 '''
 Wrapper functions to call the NodeTest class. Reason it was done like this because
 The Node class modules are cdef and cannot be called directly from python

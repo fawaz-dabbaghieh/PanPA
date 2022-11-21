@@ -1,7 +1,7 @@
 import os
 import sys
 import logging
-from ProteinAligner.Node import Node
+from PanPA.Node import Node
 import pdb
 
 

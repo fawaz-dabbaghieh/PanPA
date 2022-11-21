@@ -3,8 +3,8 @@
 import sys
 import json
 import logging
-from ProteinAligner.Graph cimport Graph
-from ProteinAligner.Node cimport Node
+from PanPA.Graph cimport Graph
+from PanPA.Node cimport Node
 
 
 cdef class Alignment:
@@ -127,8 +127,8 @@ cdef class Alignment:
         # Maybe add tp:A:(P, S) for primary or secondary alignment
         # cm:i number of minimizers (maybe see how many seeds from the read hit that graph)
         # NM:i total numbers of mismatches and gaps (indels)
-
-        self.id_score = self.n_matches / len(self.info)
+        # print(f"calculating the id_score from n matches {self.n_matches}")
+        self.id_score = self.n_matches / float(len(self.info))
         gaf_string.append(f"NM:i:{self.n_indels + self.n_mismatches}")
         gaf_string.append(f"AS:i:{str(self.alignment_score)}")
         gaf_string.append(f"dv:f:{str(round(1-self.id_score, 4))}")

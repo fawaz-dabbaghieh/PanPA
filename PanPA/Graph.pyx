@@ -6,7 +6,7 @@ import sys
 import json
 import pickle
 import collections
-from ProteinAligner.Node cimport Node
+from PanPA.Node cimport Node
 
 
 cdef class Graph:

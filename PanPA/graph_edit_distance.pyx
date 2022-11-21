@@ -3,8 +3,8 @@
 import logging
 import sys
 import time
-from ProteinAligner.Graph cimport Graph
-from ProteinAligner.Alignment cimport Alignment
+from PanPA.Graph cimport Graph
+from PanPA.Alignment cimport Alignment
 from libcpp.vector cimport vector
 from libc.stdlib cimport malloc, free
 
@@ -169,10 +169,10 @@ cpdef void align_to_graph_ed(Graph graph, str read, bint print_dp) except *:
                 above_cell = current_cell - graph_seq_len - 1
                 diagonal_cell = above_cell - 1
 
-                # because sub_matrix is linearized over all the alphabet (26 characters)
+                # because sub_matrix is linearized over all the alphabet (26 characters + 1 for the stop codon)
                 # both read_as_int and all_seq_as_int are integers with A being 0 and Z 25
                 # so accessing a certain cell in the 2d substitution matrix corresponds to
-                # first_letter * 26 + second_letter
+                # first_letter * 27 + second_letter
                 if read_as_int[i-1] == all_seq_as_int[j-1]:
                     match_miss = dp_table[diagonal_cell]
                 else:

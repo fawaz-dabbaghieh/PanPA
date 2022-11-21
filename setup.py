@@ -1,7 +1,7 @@
 import sys
 from setuptools import setup, find_packages
 from Cython.Build import cythonize
-from ProteinAligner.version import __version__
+from PanPA.version import __version__
 
 '''
 I can also check for cython's version using
@@ -12,7 +12,7 @@ now version is a string, e.g. 0.29.21
 
 '''
 It is better to ship this without the need to have Cython
-I should what is described here
+I should do what is described here
 https://cython.readthedocs.io/en/latest/src/userguide/source_files_and_compilation.html
 at section Distributing Cython Modules
 
@@ -23,16 +23,15 @@ CURRENT_PYTHON = sys.version_info[:2]
 REQUIRED_PYTHON = (3, 6)
 
 if CURRENT_PYTHON < REQUIRED_PYTHON:
-    sys.stderr.write("ProteinAligner requires Python 3.6 or higher and "
+    sys.stderr.write("PanPA requires Python 3.6 or higher and "
                      "you current verions is {}".format(CURRENT_PYTHON))
     sys.exit(1)
 
 with open("README.md", "r") as readme:
     long_description = readme.read()
 
-
 setup(
-    name="ProteinAligner",
+    name="PanPA",
     version=__version__,
     license="MIT",
     author="Fawaz Dabbaghie",
@@ -56,22 +55,11 @@ setup(
     packages=find_packages(),
     install_requires=[],
 
-    ext_modules=cythonize("ProteinAligner/*pyx",
+    ext_modules=cythonize("PanPA/*pyx",
                             compiler_directives={"boundscheck": False, "cdivision": True,
                                                "nonecheck": False, "initializedcheck": False,
                                                "language_level": "3"}),
-
-    # ext_modules=cythonize(
-    #     [
-    #         "ProteinAligner/*.pyx"
-    #     ],
-    #     compiler_directives={
-    #         "language_level": "3",
-    #         "boundscheck": False,
-    #         "wraparound": False,
-    #     },
-    # ),
     entry_points={
-        "console_scripts": ["ProteinAligner = ProteinAligner.main:main"],
+        "console_scripts": ["PanPA = PanPA.main:main"],
     },
 )

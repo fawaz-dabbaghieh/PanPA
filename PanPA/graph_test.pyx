@@ -1,6 +1,6 @@
 # distutils: language=c++
 
-from ProteinAligner.Graph cimport Graph
+from PanPA.Graph cimport Graph
 from constants import all_linear_sub_matrices
 from libcpp.vector cimport vector
 

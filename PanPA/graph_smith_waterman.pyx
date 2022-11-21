@@ -1,7 +1,7 @@
 # distutils: language=c++
 
-from ProteinAligner.Graph cimport Graph
-from ProteinAligner.Alignment cimport Alignment
+from PanPA.Graph cimport Graph
+from PanPA.Alignment cimport Alignment
 from libcpp.vector cimport vector
 from libc.stdlib cimport malloc, free
 from libcpp.string cimport string
@@ -192,14 +192,14 @@ cdef vector[string] align_to_graph_sw(Graph graph, str read,str read_name, bint 
                 diagonal_cell = above_cell - 1
 
                 """
-                because the substitution matrix is linearized over all the alphabet (26 characters)
+                because the substitution matrix is linearized over all the alphabet + the character for the stop codon (27 characters)
                 both the read and the sequences in the graph are integers with A being 0 and Z 25
                 therefore, accessing a certain "cell" in the linearized 2d substitution matrix corresponds to
-                first_letter * 26 + second_letter
+                first_letter * 27 + second_letter
                 
                 This adds a bit speed up compared to accessing key:value maps
                 """
-                match_miss = dp_table[diagonal_cell] + sub_matrix[read_as_int[i-1]*26 + all_seq_as_int[j-1]]
+                match_miss = dp_table[diagonal_cell] + sub_matrix[read_as_int[i-1]*27 + all_seq_as_int[j-1]]
 
                 deletion = dp_table[left_cell] + gap_score
                 insertion = dp_table[above_cell] + gap_score
@@ -259,7 +259,7 @@ cdef vector[string] align_to_graph_sw(Graph graph, str read,str read_name, bint 
                     left_cell = row + previous_j
                     diagonal_cell = left_cell - graph_seq_len - 1
 
-                    match_miss = dp_table[diagonal_cell] + sub_matrix[read_as_int[i - 1]*26 + all_seq_as_int[j-1]]
+                    match_miss = dp_table[diagonal_cell] + sub_matrix[read_as_int[i - 1]*27 + all_seq_as_int[j-1]]
                     #
                     # print(i, j, read[i - 1], node.seq[current_node_pos],
                     #       sub_matrix[read_as_int[i-1] + all_seq_as_int[j-1]], in_nodes_size)
@@ -309,6 +309,7 @@ cdef vector[string] align_to_graph_sw(Graph graph, str read,str read_name, bint 
         elif dp_table[i] == global_max:
             global_max_coord.push_back(i)
 
+    # print(f"The max location in matrix is {global_max_coord} and the score is {global_max}")
     # traceback now
     cdef int coord, back_coord
     cdef Alignment alignment
@@ -334,10 +335,13 @@ cdef vector[string] align_to_graph_sw(Graph graph, str read,str read_name, bint 
             back_j = back_coord % (graph_seq_len + 1)
 
             if back_j == j:  # insertion
+                # print("insertion")
                 alignment.add_alignment(j_node[j - 1], -1, j_pos[j-1], read_as_int[i - 1], i - 1)
             elif back_i == i:  # deletion
+                # print("deletion")
                 alignment.add_alignment(j_node[j - 1], all_seq_as_int[j-1], j_pos[j - 1], -1, i - 1)
             else:  # match or miss
+                # print("match or mismatch")
                 alignment.add_alignment(j_node[j-1], all_seq_as_int[j-1], j_pos[j-1], read_as_int[i - 1], i - 1)
 
             i = back_i
@@ -346,6 +350,7 @@ cdef vector[string] align_to_graph_sw(Graph graph, str read,str read_name, bint 
 
         alignment.prepare_gaf(graph, min_id_score)
         alignment_score = alignment.id_score
+        print(f"the alignment score is {alignment_score} and the min id is {min_id_score}")
         if alignment_score >= min_id_score:
             alignments.push_back(alignment.gaf.encode())
 

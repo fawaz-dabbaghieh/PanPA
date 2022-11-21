@@ -1,6 +1,6 @@
 # distutils: language=c++
 
-from ProteinAligner.Node cimport Node
+from PanPA.Node cimport Node
 import pytest
 # import inspect
 # import functools

@@ -5,7 +5,7 @@ from libc.stdlib cimport malloc, free
 import random
 import timeit
 import time
-from ProteinAligner.constants import translation_table, all_linear_sub_matrices
+from PanPA.constants import translation_table, all_linear_sub_matrices
 
 
 cdef void print_dp_table(int all_seq_len, int read_len, int *dp_table):
@@ -78,7 +78,7 @@ def sw_def_cython(str read, vector[int] seq, bint print_table, sub_matrix_name =
             diagonal_cell = above_cell - 1
 
             #"""
-            match = dp_table[diagonal_cell] + sub_matrix[(read_int[i-1] - 65) * 26 + (seq[j-1] - 65)]
+            match = dp_table[diagonal_cell] + sub_matrix[(read_int[i-1] - 65) * 27 + (seq[j-1] - 65)]
 
             # if read[i - 1] == sequence[j - 1]:
             #     match = dp_table[diagonal_cell] + match_score

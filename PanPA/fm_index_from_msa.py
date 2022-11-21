@@ -3,7 +3,7 @@ import pickle
 import os
 import sys
 import logging
-from ProteinAligner.read_fasta import read_fasta
+from PanPA.read_fasta import read_fasta
 
 """
 The initial idea here is that this will be called with either all MSA's or the GFAs generated from the MSAs

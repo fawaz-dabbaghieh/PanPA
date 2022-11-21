@@ -1,41 +1,39 @@
 # PanPA
-PanPA is a tool for building panproteome graphs and aligning sequences back to the graphs.
 
-## Usage
-So far the tools is still under development.
+PanPA (Pan-Proteome Aligner) is a tool written in Cython that build protein graphs from MSAs, build an index for the MSAs, and align query sequences back to the graphs generated. It is designed to work on amino acid graphs and the alignment can be done using many possible substitution matrix instead of only doing alignment using edit distance. It can also align DNA sequences back to amino acid graphs by translating the DNA sequences into 6 different possible reading frames.
 
-For installation, you need to have Cython installed and you can call `python3 setup.py install --user`, which should generate a local binary called panpa that can be used.
+## Introduction
+PanPA takes as input any number of MSAs in FASTA format, where each MSA represents one protein, one protein cluster, or one protein family. PanPA has three main steps:
 
-PanPA has basically 3 main steps (subcommands):
+* Indexing MSAs with `build_index` subcommand
+* Building Graphs from MSAs in GFA format with `build_gfa` subcommand
+* Aligning a query sequence back to the graphs using the `align` subcommand.
 
-* Building an index from the input MSA files.
-* Building a graph from each MSA.
-* Aligning sequences to the graphs generated using the index
+In the following sections, installation will be explained and how to use each subcommand
 
+## Installation
+PanPA is written in Cython and requires Python 3.6 or higher, and Cython 0.29 or higher.
+
+Can be installed locally by runnin `python3 setup.py install --user`
+
+## Subcommands
+Both `build_index` and `build_gfa` take any number of MSAs as input, where the MSAs can be given in a directory, a text
+with a list of FASTA files paths, or the file paths can be given in the command argument. Same
+goes for the `align` subcommand, where it takes the input graphs also in a directory, a list, or individually in the command
+
+
+### build_index
+Given input MSAs, for each sequence in the MSA, seeds are extracted, the user can specify two types of seeds
+k-mers or (w,k)-minimizers using the argument `--seeding_alg` which takes either `kmers` or `wk_min`, then
+the user needs to specify the k size with `-k, --kmer_size` and w size with `-w, --window`.
+The user also needs to give an output file name/location.
+
+The `--seed_limit` argument takes an integer, which specifies a limit to how many MSAs can one seed belong to.
+E.g. one k-mer can be present in all MSAs given, the user can specify a limit on that, and the mathces are ordered
+based on how many times that seed was present in that MSA and the top `n` will be taken. If the user chooses to keep
+all hits, then `0` is given to this argument and all seed hits will be kept in the index.
 ```
-usage: ProteinAligner [-h] [--log_file LOG_FILE] [--log_level LOG_LEVEL] {build_index,build_gfa,align} ...
-
-Protein Graphs Aligner
-
-Subcommands:
-  {build_index,build_gfa,align}
-                        Available subcommands
-    build_index         Building an index from MSAs
-    build_gfa           building GFAs out of MSAs
-    align               aligning sequences given to graphs
-
-Global Arguments:
-  -h, --help            show this help message and exit
-  --log_file LOG_FILE   The name/path of the log file. Default: log.log
-  --log_level LOG_LEVEL
-                        The logging level [DEBUG, INFO, WARNING, ERROR, CRITICAL]. Default: INFO
-```
-
-### Building index
-With the `build_index` subcommand, using `-h` will give you the following information:
-
-```
-usage: ProteinAligner build_index [-h] [-f IN_FILES [IN_FILES ...]] [-l IN_LIST] [-d IN_DIR] [-o OUT_INDEX]
+usage: PanPA build_index [-h] [-f IN_FILES [IN_FILES ...]] [-l IN_LIST] [-d IN_DIR] [-o OUT_INDEX]
                                   [--seeding_alg SEEDING_ALG] [-k K-MER] [-w WINDOW] [--seed_limit SEED_LIMIT]
 
 optional arguments:
@@ -56,19 +54,21 @@ optional arguments:
                         Window size when using w,k-minimizers instead of k-mers for indexing. Default:8
   --seed_limit SEED_LIMIT
                         Indicates how many graphs can a seed belong to. Default: 5, give 0 for no limit
+
 ```
 
-The idea is that you can give a directory full of MSAs in fasta format `-d`, a txt file with the list of these input MSAs `-l`, or just give the files as arguments `-f`. User can choose the seeding algorithm like `wk_min` or `k_mers` and the respective sizes of k and/or w.
+### build_gfa
+Same as `build_index`, takes the same set of MSAs and an output directory, and for each MSA it builds a corresponding
+graph in GFA format, with path lines `p` corresponding to each sequence in the MSA. The 
+graphs will be named the same as the original MSAs only with the extension changed to .gfa
 
-The `--seed_limit` is the limit for how many graphs can one seed belong to, if 0 then all hits are stored.
+This subcommand can be sped up by given it more than one core with `-c, --cores`
 
+NOTE: Once the GFA files are produced, you shouldn't change their names, as they need to be matched correctly
+in the index.
 
-### Building GFAs
-Similar to the previous subcommand, this takes files, a list of files, or a directory of MSAs that will be turned into graphs in GFA format.
-
-This step can be parallelized, so you can choose how many cores.
 ```
-usage: ProteinAligner build_gfa [-h] [-f IN_FILES [IN_FILES ...]] [-l IN_LIST] [-d IN_DIR] [-c CORES] [-o OUT_DIR]
+usage: PanPA build_gfa [-h] [-f IN_FILES [IN_FILES ...]] [-l IN_LIST] [-d IN_DIR] [-c CORES] [-o OUT_DIR]
 
 optional arguments:
   -h, --help            show this help message and exit
@@ -82,15 +82,24 @@ optional arguments:
                         Numbers of cores to use for aligning
   -o OUT_DIR, --out_dir OUT_DIR
                         Output directory where the index files and graphs from the MSAs are stored
-
 ```
 
-### Aligning
-For aligning, the user need to provide the index that was built with the indexing step, and the graphs built from the MSA, similar to previous the graphs are provided either as individual GFA files, a list or a directory full of the GFAs and sequences to align and cores for parallelization. The user can also use what substitution matrix to use, the gap score and a minimum alignment id cutoff to filter the alignments. The `--seed_limit` parameter basically indicates that after taking the seeds from a read and matching it to which graphs we might want to align to, this limits to how many graphs we align, the seed matches are counted and ordered, meaning if the cutoff is 5, then we align to the top 5 graphs where we mostly had hits with.
 
+### align
+For aligning query sequences to the graphs, you need to give three main inputs:
+the index that was built with `--index`, the input graphs which can be a directory, a text file with list, or
+given directly in the command, and finally the query sequences in FASTA. If DNA sequences
+are given, then the user needs to use the flag `--dna`. The user can also
+specify the substitution matrix to use for the alignment, or print a list of possible matrices with
+`--sub_matrix_list`. The user can also specify a certain gap score with `--gap_score`, a cutoff on alignment id with
+`--min_id_score`, and can set a limit to how many graphs to align to with `--seed_limit`.
+
+This step can be made faster by giving more cores.
+
+The output alignment are in GAF format. To learn more about this format please check here
 ```
-usage: ProteinAligner align [-h] [-g IN_FILES [IN_FILES ...]] [-l IN_LIST] [-d GRAPHS] [--index INDEX] [-r SEQS]
-                            [-c CORES] [--sub_matrix SUB_MATRIX] [-o GAF] [--gap_score GAP_SCORE]
+usage: PanPA align [-h] [-g IN_FILES [IN_FILES ...]] [-l IN_LIST] [-d GRAPHS] [--index INDEX] [-r SEQS] [--dna]
+                            [-c CORES] [--sub_matrix SUB_MATRIX] [--sub_matrix_list] [-o GAF] [--gap_score GAP_SCORE]
                             [--min_id_score MIN_ID_SCORE] [--seed_limit SEED_LIMIT]
 
 optional arguments:
@@ -103,10 +112,12 @@ optional arguments:
                         Path to directory with GFA files
   --index INDEX         Path to pickled index file generated in the build step
   -r SEQS, --seqs SEQS  The input sequences to align in fasta format
+  --dna                 Give this flag if the query sequences are DNA and not AA
   -c CORES, --cores CORES
                         Numbers of cores to use for aligning
   --sub_matrix SUB_MATRIX
                         Substitution matrix to use for alignment, default: blosum62
+  --sub_matrix_list     When given, a list of possible substitution matrices will be given
   -o GAF, --out_gaf GAF
                         Output alignments file path
   --gap_score GAP_SCORE
