@@ -47,14 +47,14 @@ def align_to_graph(seqs_dict, graphs, graph_files, sub_matrix,
     # cdef vector[string] alignments_vec
     print_dp = printdp
 
-    print(f"This process got {len(seqs_dict)} reads and the first 3 reads are {list(seqs_dict.keys())[0:3]}")
+    # print(f"This process got {len(seqs_dict)} reads and the first 3 reads are {list(seqs_dict.keys())[0:3]}")
     # print_dp = True
     # I extract seeds from sequence and query them against the index to get the
     # graphs that I can align to
 
     for seq_name, seq in seqs_dict.items():
         matches = query_sequence(seq, seed_index, index_info)
-        print(matches)
+        # print(matches)
         if 0 < seed_limit < len(matches):  # if seed_limit is 0 then 
             # keeping only the seeds up to the limit
             matches = matches[0:seed_limit]
@@ -68,7 +68,7 @@ def align_to_graph(seqs_dict, graphs, graph_files, sub_matrix,
                 graph = graphs[i]
                 # print(f"going to align {seq_name} to {graph.name}")
                 alignments = align_to_graph_sw(graph, seq, seq_name, print_dp, sub_matrix, gap_s, min_id_score)
-                print(f"aligned {seq_name} to graph {i} and got {alignments.size()} alignments back")
+                # print(f"aligned {seq_name} to graph {i} and got {alignments.size()} alignments back")
                 # if I wanted to add another tag, I can do it here with the frame translation
                 # I mean add it for each alignment
                 for a in alignments:

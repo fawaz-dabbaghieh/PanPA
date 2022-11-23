@@ -350,7 +350,7 @@ cdef vector[string] align_to_graph_sw(Graph graph, str read,str read_name, bint 
 
         alignment.prepare_gaf(graph, min_id_score)
         alignment_score = alignment.id_score
-        print(f"the alignment score is {alignment_score} and the min id is {min_id_score}")
+        # print(f"the alignment score is {alignment_score} and the min id is {min_id_score}")
         if alignment_score >= min_id_score:
             alignments.push_back(alignment.gaf.encode())
 
