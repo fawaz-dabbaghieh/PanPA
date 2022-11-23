@@ -39,4 +39,4 @@ for f in os.listdir(in_dir):
 
 for f in tomove_files:
 	if os.path.exists(f):
-		shutil.copy(f, out_dir)
+		shutil.move(f, out_dir)

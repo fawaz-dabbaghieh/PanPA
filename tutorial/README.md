@@ -1,5 +1,5 @@
 # Tutorial on PanPA (full working example)
-We start with 16 E. coli annotations randomly selected from NCBI
+We start with 10 E. coli annotations randomly selected from NCBI
 
 | **Accession**   | **FTP Link**                                                                      |
 |-----------------|-----------------------------------------------------------------------------------|

@@ -88,3 +88,4 @@ elif [[ $file_given == *fastq.gz ]] || [[ $file_given == *fq.gz ]]; then
 
 else
 	echo "File doesn't have the extension .fasta, .fa, .fastq, or .fq or a .gz version of these extensions"
+fi
