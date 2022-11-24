@@ -1,3 +1,5 @@
+# distutils: language=c++
+
 from collections import namedtuple, deque
 import pickle
 import sys

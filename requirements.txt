@@ -1,2 +1,2 @@
 setuptools~=45.2.0
-Cython~=0.29.21
+

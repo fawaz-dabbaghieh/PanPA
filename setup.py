@@ -55,8 +55,7 @@ setup(
     packages=find_packages(),
     install_requires=[],
 
-    ext_modules=cythonize("PanPA/*pyx",
-                            compiler_directives={"boundscheck": False, "cdivision": True,
+    ext_modules=cythonize("PanPA/*pyx", compiler_directives={"boundscheck": False, "cdivision": True,
                                                "nonecheck": False, "initializedcheck": False,
                                                "language_level": "3"}),
     entry_points={

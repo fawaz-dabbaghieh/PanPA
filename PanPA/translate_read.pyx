@@ -1,3 +1,5 @@
+# distutils: language=c++
+
 from PanPA.constants import translation_table
 import PanPA.reverse_complement_fast.reverse_complement as reverse
 
