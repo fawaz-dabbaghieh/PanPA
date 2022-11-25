@@ -1,3 +1,11 @@
+- [PanPA](#panpa)
+  * [Introduction](#introduction)
+  * [Installation](#installaion)
+  * [Subcommands](#subcommands)
+    + [Building Index](#building-index)
+    + [Building Graphs](#building-graphs)
+    + [Aligning](#aligning)
+
 # PanPA
 
 PanPA (Pan-Proteome Aligner) is a tool written in Cython that builds protein graphs from MSAs, builds an index for the MSAs, and aligns query sequences back to the graphs generated. It is designed to work on amino acid graphs and the alignment can be done using many possible substitution matrix instead of only doing alignment using edit distance. It can also align DNA sequences back to amino acid graphs by translating the DNA sequences into 6 different possible reading frames.
@@ -24,8 +32,8 @@ with a list of FASTA files paths, or the file paths can be given in the command 
 goes for the `align` subcommand, where it takes the input graphs also in a directory, a list, or individually in the command
 
 
-### build_index
-Given input MSAs, for each sequence in the MSA, seeds are extracted, the user can specify two types of seeds
+### Building Index
+The subommands `build_index` takes MSAs as input, and for each sequence in the MSA, seeds are extracted, the user can specify two types of seeds
 k-mers or (w,k)-minimizers using the argument `--seeding_alg` which takes either `kmers` or `wk_min`, then
 the user needs to specify the k size with `-k, --kmer_size` and w size with `-w, --window`.
 The user also needs to give an output file name/location.
@@ -59,8 +67,8 @@ optional arguments:
 
 ```
 
-### build_gfa
-Same as `build_index`, takes the same set of MSAs and an output directory, and for each MSA it builds a corresponding
+### Building Graphs
+Same as `build_index`, `build_gfa` takes the same set of MSAs and an output directory, and for each MSA it builds a corresponding
 graph in GFA format, with path lines `p` corresponding to each sequence in the MSA. The 
 graphs will be named the same as the original MSAs only with the extension changed to .gfa
 
@@ -84,11 +92,12 @@ optional arguments:
                         Numbers of cores to use for aligning
   -o OUT_DIR, --out_dir OUT_DIR
                         Output directory where the index files and graphs from the MSAs are stored
+
 ```
 
 
-### align
-For aligning query sequences to the graphs, you need to give three main inputs:
+### Aligning
+For aligning query sequences to the graphs, you need to give three main inputs to the subcommand `align`:
 the index that was built with `--index`, the input graphs which can be a directory, a text file with list, or
 given directly in the command, and finally the query sequences in FASTA. If DNA sequences
 are given, then the user needs to use the flag `--dna`. The user can also

@@ -1,3 +1,14 @@
+- [Tutorial on PanPA (full working example)](#tutorial-on-panpa-full-working-example)
+  * [Requirements](#requirements)
+  * [Data](#data)
+    + [Step 1: Download annotations](#step-1-download-annotations)
+    + [Step 2: Separating into groups](#step-2-separating-into-groups)
+    + [Step 3: Generating clusters with mmseqs](#step-3-generating-clusters-with-mmseqs)
+    + [Step 4: Generating MSAs from clusters](#step-4-generating-msas-from-clusters)
+    + [Step 5: MSA to GFA](#step-5-msa-to-gfa)
+    + [Step 6: Indexing](#step-6-indexing)
+    + [Step 7: Aligning](#step-7-aligning)
+
 # Tutorial on PanPA (full working example)
 This tutorial is an example of how to use PanPA starting from collected annotations from NCBI of 
 10 E. coli assemblies and ends with graphs to align against.
