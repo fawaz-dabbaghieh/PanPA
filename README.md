@@ -1,6 +1,6 @@
 - [PanPA](#panpa)
   * [Introduction](#introduction)
-  * [Installation](#installaion)
+  * [Installation](#installation)
   * [Subcommands](#subcommands)
     + [Building Index](#building-index)
     + [Building Graphs](#building-graphs)
