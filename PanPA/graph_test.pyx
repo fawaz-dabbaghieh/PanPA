@@ -3,7 +3,6 @@
 from PanPA.Graph cimport Graph
 from constants import all_linear_sub_matrices
 from libcpp.vector cimport vector
-
 import time
 
 

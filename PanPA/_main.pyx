@@ -7,6 +7,7 @@ from PanPA.graph_from_msa import msa_graph
 from PanPA.index_sequences import *
 from PanPA.graph_smith_waterman cimport align_to_graph_sw
 from PanPA.constants import all_linear_sub_matrices
+from PanPA.translate_read import translate
 from libcpp.vector cimport vector
 import multiprocessing as mp
 from libcpp.string cimport string
@@ -34,8 +35,8 @@ def check_existance(files):
 
 
 def align_to_graph(seqs_dict, graphs, graph_files, sub_matrix,
-                   gap_score, seed_index, index_info, seed_limit, min_id_score, queue, printdp = False,
-                   reading_frame=b""):
+                   gap_score, seed_index, index_info, seed_limit, min_id_score, queue, printdp,
+                   dna):
     """
     Takes a dict with several reads and their names, and align them and add them to the queue
     """
@@ -52,40 +53,51 @@ def align_to_graph(seqs_dict, graphs, graph_files, sub_matrix,
     # I extract seeds from sequence and query them against the index to get the
     # graphs that I can align to
 
+    # if DNA is true, then instead of going through each seq I go through each seq's frames and add
+    # that frame to the alignment output with RF:i:value (values are 1,2,3,-1,-2,-3)
+    frames_to_bytes = {1:b"1", 2:b"2", 3:b"3", -1:b"-1", -2:b"-2", -3:b"-3"}
     for seq_name, seq in seqs_dict.items():
-        matches = query_sequence(seq, seed_index, index_info)
-        # print(matches)
-        if 0 < seed_limit < len(matches):  # if seed_limit is 0 then 
-            # keeping only the seeds up to the limit
-            matches = matches[0:seed_limit]
+        if dna:
+            reading_frames = translate(seq)
+        else:
+            reading_frames = {0:seq}  # just a dict with one sequences
 
-        if matches:
-            for i in matches:
-                if graphs[i] is None:
-                    logging.warning("There's a seed without a matching graph")
-                    continue
+        for frame, seq in reading_frames.items():
+            matches = query_sequence(seq, seed_index, index_info)
+            # print(matches)
+            if 0 < seed_limit < len(matches):  # if seed_limit is 0 then
+                # keeping only the seeds up to the limit
+                matches = matches[0:seed_limit]
 
-                graph = graphs[i]
-                # print(f"going to align {seq_name} to {graph.name}")
-                alignments = align_to_graph_sw(graph, seq, seq_name, print_dp, sub_matrix, gap_s, min_id_score)
-                # print(f"aligned {seq_name} to graph {i} and got {alignments.size()} alignments back")
-                # if I wanted to add another tag, I can do it here with the frame translation
-                # I mean add it for each alignment
-                for a in alignments:
-                    if not reading_frame:
-                        queue.put(a)
-                    else:
-                        queue.put(a + b"\tRF:i:" + reading_frame)
-                # I am not adding alignments to queue immediately to decrease the amount of synchronization needed
-                # while several processes are trying to add to the queue, after getting all alignments
-                # I add them to the queue
-                # for a in alignments:
-                #     alignments_vec.push_back(a)
-                # print(f"It took {time.perf_counter() - start} to align {seq_name} with length {len(seq)}")
+            if matches:
+                for i in matches:
+                    if graphs[i] is None:
+                        logging.warning("There's a seed without a matching graph")
+                        continue
+                    graph = graphs[i]
+                    # print(f"going to align {seq_name} to {graph.name}")
+                    alignments = align_to_graph_sw(graph, seq, seq_name, print_dp, sub_matrix, gap_s, min_id_score)
+                    # print(f"aligned {seq_name} to graph {i} and got {alignments.size()} alignments back")
+                    # if I wanted to add another tag, I can do it here with the frame translation
+                    # I mean add it for each alignment
+                    for a in alignments:
+                        if frame == 0:  # it's a protein sequence
+                            queue.put(a)
+                        else:  # it's a DNA sequence with a frame
+                            queue.put(a + b"\tRF:i:" + frames_to_bytes[frame])
+                    # if not reading_frame:
+                    #     queue.put(a)
+                    # else:
+                    #     queue.put(a + b"\tRF:i:" + reading_frame)
+                    # I am not adding alignments to queue immediately to decrease the amount of synchronization needed
+                    # while several processes are trying to add to the queue, after getting all alignments
+                    # I add them to the queue
+                    # for a in alignments:
+                    #     alignments_vec.push_back(a)
+                    # print(f"It took {time.perf_counter() - start} to align {seq_name} with length {len(seq)}")
 
-        # for a in alignments_vec:
-        #     queue.put(a)
-
+            # for a in alignments_vec:
+            #     queue.put(a)
     queue.put(b'0')  # sentinel
 
 
@@ -101,8 +113,18 @@ def align_aa(graphs, index, graph_files, sub_matrix, args):
     queue = mp.Queue()
     out_gaf = open(args.out_gaf, "w")
     seqs_dicts = [dict()]
+    dna = args.is_dna  # true or false
     for seq_name, seq in read_fasta_gen(args.in_seqs):
+        # if DNA I can convert here and continue normally
+        # the only difference is that I need a a reading frame tag
+        # I can add the reading frame to the end of seq_name
+        # and extract it inside align_to_graph function and add it to the alignment produced
+        # so I don't really need to change much in the code
 
+        # todo I need to add a counter for how many alignments done
+        #   I can add a new queue maybe where each process returns an int of how many alignments it did
+        #   I can sum them all and print the number
+        #   but then it won't be consistent (not regular intervals)
         if seq_counter != 100:  # preparing batch
             seqs_dicts[-1][seq_name] = seq
             seq_counter += 1
@@ -111,15 +133,17 @@ def align_aa(graphs, index, graph_files, sub_matrix, args):
             seqs_dicts[-1][seq_name] = seq
             seq_counter = 0
 
-            # we already have enough batches
-            if len(seqs_dicts) != args.n_cores:
+            if len(seqs_dicts) != args.n_cores:  # we don't have enough batches yet
                 seqs_dicts.append(dict())
-            else:
-                for seqs in seqs_dicts:
+            else:  # we have enough batches to deploy
+                for seqs in seqs_dicts:  # for each batch
+                    # (seqs_dict, graphs, graph_files, sub_matrix,
+                    #  gap_score, seed_index, index_info, seed_limit, min_id_score, queue, printdp,
+                    #  dna)
                     # I can also add the reading frame now, which is a binary string
                     p = mp.Process(target=align_to_graph, args=(seqs, graphs, graph_files,
                                                                 sub_matrix, args.gap_score, seed_index, index_info,
-                                                                args.seed_limit, args.min_id_score, queue,))
+                                                                args.seed_limit, args.min_id_score, queue, False, dna,))
                     processes.append(p)
 
                 for p in processes:
@@ -150,7 +174,7 @@ def align_aa(graphs, index, graph_files, sub_matrix, args):
     for seqs in seqs_dicts:
         processes.append(mp.Process(target=align_to_graph, args=(seqs, graphs, graph_files,
                                                                  sub_matrix, args.gap_score, seed_index, index_info,
-                                                                 args.seed_limit, args.min_id_score, queue,)))
+                                                                 args.seed_limit, args.min_id_score, queue,False, dna,)))
     new_sent_len = len(processes)
     for p in processes:
         p.start()
@@ -167,10 +191,6 @@ def align_aa(graphs, index, graph_files, sub_matrix, args):
 
     out_gaf.close()
     logging.info("Done!")
-
-
-def align_dna(graphs, index, graph_files, sub_matrix, args):
-    pass
 
 
 def load_graph(graph_file, graph_n, graphs, lock):
@@ -432,6 +452,9 @@ def _main(sys_argv, args, msa_name=None):
             print(message)
             sys.exit(0)
 
+        if not 0 <= args.min_id_score <= 1:
+            exit_error("The min alignment identity score needs to be between 0 and 1")
+
         # checking the substitution matrix the user chose exists or not
         if not args.sub_matrix in all_linear_sub_matrices:
             available_matrices = []
@@ -466,25 +489,6 @@ def _main(sys_argv, args, msa_name=None):
         if args.n_cores > os.cpu_count():
             args.n_cores = os.cpu_count()
         graphs = [None] * len(index['files_index'])
-        # the tmp is used later, but doesn't make sense to load the graphs then error out on this
-        # so if there's a problem here, should be reported before I spend time loading things
-        # try:
-        #     os.mkdir("tmp_dir")
-        # except PermissionError:
-        #     print("Error! Please check the log file")
-        #     logging.error("Was not able to make a tmp directory due to Permission Error, check your privileges")
-        #     sys.exit(1)
-        #
-        # except MemoryError:
-        #     print("Error! Please check the log file")
-        #     logging.error("Was not able to make a tmp directory due to Memory Error")
-        #     sys.exit(1)
-        #
-        # except Exception as e:
-        #     print("Error! Please check the log file")
-        #     logging.error(f"The tool was not able to make a tmp directory because of {e}")
-        #     sys.exit(1)
-
 
         # generating a graph object for each gfa file and adding it to a list
         # sorted the files first to match the original indices
@@ -520,54 +524,21 @@ def _main(sys_argv, args, msa_name=None):
             graphs[idx] = graph
             # graphs.append(graph)
             logging.info(f"The graph {f} has {len(graph.nodes)} nodes and is loaded")
-            # todo do this as multithreaded again and use the queue sentinal trick
-            #   maybe batches of graphs that get loaded then returned just like the alignments
-        # lock = mp.Lock()
-        # # queue = mp.Queue()
-        # processes = []
-        # for idx, f in enumerate(graph_files):
-        #     process = mp.Process(target=load_graph, args=(f, idx, graphs, lock,))
-        #     processes.append(process)
-        #     # graph_batch.append(f)
-        #     if len(processes) == args.n_cores:
-        #         for p in processes:
-        #             p.start()
-        #         for p in processes:
-        #             p.join()
-        #         # for p in processes:
-        #         #     graph = queue.get()
-        #         #     graphs.append(graph)
-        #         # re-initialization
-        #         processes = []
-        #         queue = mp.Queue()
-        #
-        #     counter += 1
-        #     if counter % checkpoint == 0:
-        #         logging.info(f"Loaded {counter} graphs so far...")
-        # print(graphs)
-        # # leftovers
-        # if processes:
-        #     print("In the leftovers now")
-        #     for p in processes:
-        #         p.start()
-        #     for p in processes:
-        #         p.join()
-        #     # for p in processes:
-        #     #     graph = queue.get()
-        #     #     graphs.append(graph)
-        logging.info(f"Aligning sequences to graphs and outputting to {args.out_gaf}")
-        # out_gaf_files = []
 
-        # for i in range(args.n_cores):
-        #     # out_gaf_files.append(open(f"tmp_dir/tmp_gaf_{i}.gaf", "a"))
-        #     out_gaf_files.append(f"tmp_dir/tmp_gaf_{i}.gaf")
-        # get a batch of reads as many cores as the user gave
-        # batch_of_reads = []
-        if not args.is_dna:
-            # print("going into align_aa")
-            align_aa(graphs, index, graph_files, sub_matrix, args)
-        else:
-            align_dna(graphs, index, graph_files, sub_matrix, args)
+
+        logging.info(f"Aligning sequences to graphs and outputting to {args.out_gaf}")
+
+        # I don't need a whole other function for align_dna
+        # I can give a DNA flag, and the flag tells align_to_graph_ss
+        # that this is a DNA sequence and I add the reading frame info the the seq name
+        # so align_to_graph_ss extracts the reading frame name and adds it to the alignment
+        # output if there was an alignment output
+        align_aa(graphs, index, graph_files, sub_matrix, args)
+        # if not args.is_dna:
+        #     # print("going into align_aa")
+        #     align_aa(graphs, index, graph_files, sub_matrix, args)
+        # else:
+        #     align_dna(graphs, index, graph_files, sub_matrix, args)
 
         """
         seems like the good way to do this is to start a p = multiprocessing.Process(target=alignment_fun, args(*args,)

@@ -7,7 +7,7 @@ cdef extern from "Python.h":
 This part done by Sanjay Srikakulam
 """
 
-cdef str reverse_complement(str seq):
+cpdef str reverse_complement(str seq):
     """TCreates reverse complement to a nucleotide sequence
     Args:
       seq: Any length nucleotide sequence

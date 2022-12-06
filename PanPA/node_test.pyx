@@ -2,8 +2,6 @@
 
 from PanPA.Node cimport Node
 import pytest
-# import inspect
-# import functools
 
 
 # def cytest(func):

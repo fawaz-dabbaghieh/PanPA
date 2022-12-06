@@ -1,7 +1,8 @@
 # distutils: language=c++
 
+import logging
 from PanPA.constants import translation_table
-import PanPA.reverse_complement_fast.reverse_complement as reverse
+from PanPA.reverse_complement_fast import reverse_complement
 
 """
 Some notes from the Biopython library
@@ -10,13 +11,12 @@ or a stop codon.  These are translated as "X".  Any invalid codon
 (e.g. "TA?" or "T-A") will throw an error.
 """
 
-def translate(seq, seq_name):
+def translate(seq):
     """
     Takes a DNA sequence and it's id and returns a dictionary with the 6 different translations
     adds the character '[' as a stop codon. The reason is because [ is the character after Z
 
     :param seq: dna sequence
-    :param seq_name: the dna sequence id
     :return to_return: a dictionary of the 6 different translations
     """
 
@@ -40,7 +40,7 @@ def translate(seq, seq_name):
                 elif translation_table[codon] == "_":  # stop codon
                     translations[j] += '['
                 elif codon not in translation_table:
-                    print("Warning! Codon {} not found in the translation table and X is used for this codon".format(codon))
+                    logging.warning("Warning! Codon {} not found in the translation table and X is used for this codon".format(codon))
                     translations[j] += "X"
                 else:
                     translations[j] += translation_table[codon]
@@ -49,7 +49,7 @@ def translate(seq, seq_name):
     if not seq:
         return "", "", 0
 
-    reverse_seq = reverse(seq)
+    reverse_seq = reverse_complement(seq)
     reading_frames = inner_loop(seq)
     reading_frames_reverse = inner_loop(reverse_seq)
     reading_frames = {1: reading_frames[0], 2: reading_frames[1], 3: reading_frames[2],
@@ -73,7 +73,7 @@ def translate_no_stop(seq, seq_name):
         return []
 
     # reverse complement of a seq
-    reverse_seq = reverse(seq)
+    reverse_seq = reverse_complement(seq)
 
     # I'm checking all 6 different reading frames (3 forward and 3 reverse)
     reading_frames = [""] * 3
