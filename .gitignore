@@ -3,6 +3,23 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+# compiled scripts
+PanPA/Alignment.cpp
+PanPA/Graph.cpp
+PanPA/Node.cpp
+PanPA/_main.cpp
+PanPA/alignment_test.cpp
+PanPA/graph_edit_distance.cpp
+PanPA/graph_from_msa.cpp
+PanPA/graph_smith_waterman.cpp
+PanPA/graph_test.cpp
+PanPA/index_sequences.cpp
+PanPA/node_test.cpp
+PanPA/reverse_complement_fast.c
+PanPA/running_test.cpp
+PanPA/smith_waterman.cpp
+PanPA/translate_read.cpp
+
 # C extensions
 *.so
 update_this_repo.sh

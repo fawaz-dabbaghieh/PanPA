@@ -66,6 +66,15 @@ def read_fasta(fasta_file_path):
     return sequences
 
 
+def target_in_table(targets, line):
+    it_is = False
+    for t in targets:
+        if t in line:
+            it_is = True
+            break
+    return it_is
+
+
 def get_aa(seq, start, end, strand):
     if strand == "-":  # because reverse complement
         tmp_end = len(seq) - start + 1
@@ -89,28 +98,34 @@ def get_aa(seq, start, end, strand):
 
 
 if len(sys.argv) < 4:
-    print("you need to give an assembly, info table, target protein patric ID")
+    print("you need to give an assembly, patric table, one or more protein name or ID")
     sys.exit()
 
 
 assembly = sys.argv[1]
 strain = assembly.split(os.sep)[-1].split(".fna")[0]
 table = sys.argv[2]
-target = sys.argv[3]
-START = 9
-END = 10
-STRAND = 11
+targets = []
+for t in sys.argv[3:]:
+    targets.append(t)
+
 CONTIG = 2
 
 all_targets = []
 with open(table, "r") as infile:
     for l in infile:
-        if target in l:
+        if target_in_table(targets, l):
             all_targets.append(l.split("\t"))
 
 sequences = read_fasta(assembly)
 
 for t in all_targets:
+    try:
+        STRAND = t.index("-")
+    except ValueError:
+        STRAND = t.index("+")
+    START = STRAND - 2
+    END = STRAND - 1
     start = int(t[START])
     end = int(t[END])
     strand = t[STRAND]
