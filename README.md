@@ -8,7 +8,9 @@
 
 # PanPA
 
-PanPA (Pan-Proteome Aligner) is a tool written in Cython that builds protein graphs from MSAs, builds an index for the MSAs, and aligns query sequences back to the graphs generated. It is designed to work on amino acid graphs and the alignment can be done using many possible substitution matrix instead of only doing alignment using edit distance. It can also align DNA sequences back to amino acid graphs by translating the DNA sequences into 6 different possible reading frames.
+PanPA (Pan-Proteome Aligner) is a tool written in `Cython` that builds protein graphs from MSAs, builds an index for the MSAs, and aligns query sequences back to the graphs generated. It is designed to work on amino acid graphs and the alignment can be done using many possible substitution matrix instead of only doing alignment using edit distance. It can also align DNA sequences back to amino acid graphs by translating the DNA sequences into 6 different possible reading frames.
+
+Full documentation on [Readthedocs](https://panpa-readthedocs.readthedocs.io/en/latest/index.html)
 
 ## Introduction
 PanPA takes as input any number of MSAs in FASTA format, where each MSA represents one protein, one protein cluster, or one protein family. PanPA has three main steps:
