@@ -2,7 +2,10 @@
 __pycache__/
 *.py[cod]
 *$py.class
+.idea/
+*.html
 
+dna_alignment_test/
 # compiled scripts
 PanPA/Alignment.cpp
 PanPA/Graph.cpp

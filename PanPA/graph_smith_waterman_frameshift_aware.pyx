@@ -5,6 +5,9 @@ from PanPA.Alignment cimport Alignment
 from libcpp.vector cimport vector
 from libc.stdlib cimport malloc, free
 from libcpp.string cimport string
+from PanPA.constants import all_linear_sub_matrices
+from PanPA.reverse_complement_fast import reverse_complement
+from PanPA.constants import translation_table
 
 
 cdef void print_dp_table(int all_seq_len, int read_len, int *dp_table, vector[int] graph_seq,
@@ -35,10 +38,8 @@ cdef void print_dp_table(int all_seq_len, int read_len, int *dp_table, vector[in
         line = []
     print("\n")
 
-
-cdef vector[string] align_to_graph_sw(Graph graph, str read,str read_name, bint print_dp,
-                             vector[int] sub_matrix, int gap_score, min_id_score) except *:
-
+cdef vector[string] align_to_graph_sw_fsa(Graph graph, str read, str read_name, bint print_dp,
+                                      vector[int] sub_matrix, int gap_score, min_id_score) except *:
     """
     This function applies a Smith-Waterman algorithm but for graphs (Partial Order Alignment)
     The columns are constructed from the topologically ordered nodes
@@ -106,7 +107,7 @@ cdef vector[string] align_to_graph_sw(Graph graph, str read,str read_name, bint 
     """
     Converting the read to integers
     declaring the dp table and filling it with 0 values
-    
+
     and filling traceback table
     """
     cdef vector[int] read_as_int
@@ -156,11 +157,11 @@ cdef vector[string] align_to_graph_sw(Graph graph, str read,str read_name, bint 
             # print("i {}, j {}".format(i, j))
             """
             I have 3 situations:
-            
+
             1- I am at the left border of a node and the node doesn't have in nodes (no more tracebacks)
-            
+
             2- I am not at the left border of the node so I only need to look at i-1 j-1 in the dp-table
-            
+
             3- I am at the left border and the node has in nodes
             This one then need the column jumping, because I need to look at the previous_j for each in node, which
             corresponds to the end of that node. e.g. node1:SVT-->node2:RPP and if I am R then I need to look at where
@@ -170,8 +171,8 @@ cdef vector[string] align_to_graph_sw(Graph graph, str read,str read_name, bint 
             in_nodes.clear()
             in_nodes_size = 0
 
-            current_node_id = j_node[j-1]  # which node corresponds to the current j
-            current_node_pos = j_pos[j-1]  # where in that node am I
+            current_node_id = j_node[j - 1]  # which node corresponds to the current j
+            current_node_pos = j_pos[j - 1]  # where in that node am I
             if current_node_pos == 0:  # we are at a new node
                 which_node += 1
 
@@ -184,7 +185,7 @@ cdef vector[string] align_to_graph_sw(Graph graph, str read,str read_name, bint 
 
             # 1 and 2 situation
             if (current_node_pos != 0) or (current_node_pos == 0 and in_nodes_size == 0):
-            # if (current_node_pos != 0) or :
+                # if (current_node_pos != 0) or :
 
                 current_cell = row + j
                 left_cell = current_cell - 1
@@ -196,18 +197,16 @@ cdef vector[string] align_to_graph_sw(Graph graph, str read,str read_name, bint 
                 both the read and the sequences in the graph are integers with A being 0 and Z 25
                 therefore, accessing a certain "cell" in the linearized 2d substitution matrix corresponds to
                 first_letter * 27 + second_letter
-                
+
                 This adds a bit speed up compared to accessing key:value maps
                 """
-                match_miss = dp_table[diagonal_cell] + sub_matrix[read_as_int[i-1]*27 + all_seq_as_int[j-1]]
+                match_miss = dp_table[diagonal_cell] + sub_matrix[read_as_int[i - 1] * 27 + all_seq_as_int[j - 1]]
 
                 deletion = dp_table[left_cell] + gap_score
                 insertion = dp_table[above_cell] + gap_score
 
                 local_max = max(match_miss, deletion, insertion, 0)
 
-                # print(f"1 read/graph {chr(read_as_int[i-1]+65)}/{chr(all_seq_as_int[j-1] + 65)} match or miss score {match_miss}, deletion {deletion}, insertion {insertion}, local_max {local_max}")
-                # filling the traceback table
                 if local_max == match_miss:
                     traceback_table[current_cell] = diagonal_cell
                 elif local_max == deletion:
@@ -215,20 +214,8 @@ cdef vector[string] align_to_graph_sw(Graph graph, str read,str read_name, bint 
                 elif local_max == insertion:
                     traceback_table[current_cell] = above_cell
 
-                # this was causing some problem and still don't know why
-                # I was doing this to keep a max instead of looking through the whole table later
-                # but I guess computationally it's the same number of comparisons/operations, so would be ok
-                # updating global max if needed
-                # if local_max > global_max:
-                #     global_max = local_max
-                #     global_max_coord.clear()
-                #     global_max_coord.push_back(current_cell)
-                # elif local_max == global_max:
-                #     global_max_coord.push_back(current_cell)
-
 
                 dp_table[current_cell] = local_max
-                # print(i, j, current_cell, left_cell, above_cell, diagonal_cell, local_max)
 
 
             # situation 3
@@ -259,7 +246,7 @@ cdef vector[string] align_to_graph_sw(Graph graph, str read,str read_name, bint 
                     left_cell = row + previous_j
                     diagonal_cell = left_cell - graph_seq_len - 1
 
-                    match_miss = dp_table[diagonal_cell] + sub_matrix[read_as_int[i - 1]*27 + all_seq_as_int[j-1]]
+                    match_miss = dp_table[diagonal_cell] + sub_matrix[read_as_int[i - 1] * 27 + all_seq_as_int[j - 1]]
                     #
                     # print(i, j, read[i - 1], node.seq[current_node_pos],
                     #       sub_matrix[read_as_int[i-1] + all_seq_as_int[j-1]], in_nodes_size)
@@ -336,13 +323,13 @@ cdef vector[string] align_to_graph_sw(Graph graph, str read,str read_name, bint 
 
             if back_j == j:  # insertion
                 # print("insertion")
-                alignment.add_alignment(j_node[j - 1], -1, j_pos[j-1], read_as_int[i - 1], i - 1)
+                alignment.add_alignment(j_node[j - 1], -1, j_pos[j - 1], read_as_int[i - 1], i - 1)
             elif back_i == i:  # deletion
                 # print("deletion")
-                alignment.add_alignment(j_node[j - 1], all_seq_as_int[j-1], j_pos[j - 1], -1, i - 1)
+                alignment.add_alignment(j_node[j - 1], all_seq_as_int[j - 1], j_pos[j - 1], -1, i - 1)
             else:  # match or miss
                 # print("match or mismatch")
-                alignment.add_alignment(j_node[j-1], all_seq_as_int[j-1], j_pos[j-1], read_as_int[i - 1], i - 1)
+                alignment.add_alignment(j_node[j - 1], all_seq_as_int[j - 1], j_pos[j - 1], read_as_int[i - 1], i - 1)
 
             i = back_i
             j = back_j
@@ -360,20 +347,18 @@ cdef vector[string] align_to_graph_sw(Graph graph, str read,str read_name, bint 
     return alignments
 
 
-############################################################ gotoh algorithm, affine gap
-"""
-It was quite tricky to figure out how to jump through the 3 matrices easily until I read this article
-http://florianerhard.github.io/2016/gotoh3
-Where all I need to do is fill the matrices, and when the traceback comes, I go diagonal in the main matrix when
-diagonal is the answer, when it's I or D (insertion, deletion), then I go k steps and in each step I calculate, 
-A[i, j-k] (or A[i-k, j]) + g(k) and if it's the same as A(i,j) where I started, then that's how many 
-insertion/deletions I need to add and now I land on A(i, j-k) or A(i-k,j) and that's my new cell and I check the score
-again. Therefore, I can keep a backtrace matrix but maybe have -1 and -2 for example that point me to deletion or
-insertion, because I don't really need to jump to I and D matrices if I am using this trick from the article, I can
-stay on the A matrix.
-Or I don't have to do a backtrace matrix and just recalculate for the cells (at least the guy from the article suggest
-it's faster)
-I have tried this trick on this example and it worked
-http://anythingtutorials.blogspot.com/2016/04/bioinformatics-gotoh-algorithm.html
+def align_dna_seq(gfa_file, seq, seq_name, sub_matrix_name, gap_s, min_id_score, print_dp):
+    cdef Graph graph
+    cdef vector[int] sub_matrix
+    # for the codon translation I can generate a static vector[vector[int]] once and I just give it to this functions
+    # which gives it to the alignment function to use
+    # so I only construct it once when I run the program, i.e. construct it in _main and give it to this function later
 
-"""
+    # for testing I can copy some of these files and build them in place with a simple setup script
+    # like this python3 setup.py build_ext --inplace
+    # or make a new subcommand for now and have the test there and keep building PanPA I guess
+    for i in all_linear_sub_matrices["blosum62"]:
+        sub_matrix.push_back(i)
+
+    graph = Graph(gfa_file)
+    alignments = align_to_graph_sw_fsa(graph, seq, seq_name, print_dp, sub_matrix, gap_s, min_id_score)

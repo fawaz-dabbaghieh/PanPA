@@ -125,7 +125,7 @@ def align_aa(graphs, index, graph_files, sub_matrix, args):
         #   I can add a new queue maybe where each process returns an int of how many alignments it did
         #   I can sum them all and print the number
         #   but then it won't be consistent (not regular intervals)
-        if seq_counter != 100:  # preparing batch
+        if seq_counter != 1000:  # preparing batch
             seqs_dicts[-1][seq_name] = seq
             seq_counter += 1
 
