@@ -8,10 +8,10 @@ This part done by Sanjay Srikakulam
 """
 
 cpdef str reverse_complement(str seq):
-    """TCreates reverse complement to a nucleotide sequence
-    Args:
-      seq: Any length nucleotide sequence
-    Returns: Reverse complemented sequence
+    """
+    Creates reverse complement to a nucleotide sequence
+    :param seq: Any length nucleotide sequence
+    :return: Reverse complemented sequence
     """
     cdef char * basemap = [b'\0', b'\0', b'\0', b'\0', b'\0', b'\0', b'\0', b'\0', b'\0', b'\0', b'\0', b'\0', b'\0',
                            b'\0', b'\0', b'\0', b'\0', b'\0', b'\0', b'\0', b'\0', b'\0', b'\0', b'\0', b'\0', b'\0',

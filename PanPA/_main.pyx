@@ -19,6 +19,19 @@ def exit_error(message):
     sys.exit(1)
 
 
+def check_output_file(output_file):
+    if os.path.exists(output_file):
+        exit_error(f"The file {output_file} already exists, not going to overwrite it")
+    try:
+        test = open(output_file, "w")
+        test.close()
+    except PermissionError:
+        exit_error(f"Was not able to create {output_file}, permission denied")
+
+    if os.path.exists(output_file):
+        os.remove(output_file)
+
+
 def check_existance(files):
     """
     check if the paths of given files exist or not, if not, it will write a warning to the log file and remove
@@ -48,13 +61,11 @@ def align_to_graph(seqs_dict, graphs, graph_files, sub_matrix,
     # cdef vector[string] alignments_vec
     print_dp = printdp
 
-    # print(f"This process got {len(seqs_dict)} reads and the first 3 reads are {list(seqs_dict.keys())[0:3]}")
-    # print_dp = True
-    # I extract seeds from sequence and query them against the index to get the
-    # graphs that I can align to
-
     # if DNA is true, then instead of going through each seq I go through each seq's frames and add
     # that frame to the alignment output with RF:i:value (values are 1,2,3,-1,-2,-3)
+    # todo need to remove this and just make it align any sequence to graphs
+    #    this would solve the issue of aligning DNA to DNA graphs
+    #    then when --dna is given, then I do the frameshift aware one
     frames_to_bytes = {1:b"1", 2:b"2", 3:b"3", -1:b"-1", -2:b"-2", -3:b"-3"}
     for seq_name, seq in seqs_dict.items():
         if dna:
@@ -209,6 +220,99 @@ def load_graph(graph_file, graph_n, graphs, lock):
         lock.release()
 
 
+def call_align_single(in_graph, in_seqs, is_dan, sub_matrix, gap_score, min_id_score, queue):
+    cdef Graph graph
+    cdef bint print_dp = False
+    cdef vector[string] alignments
+    cdef int gap_s = gap_score
+    cdef string a
+
+    graph = in_graph
+
+    for seq_name, seq in in_seqs.items():
+        alignments = align_to_graph_sw(graph, seq, seq_name, print_dp, sub_matrix, gap_score, min_id_score)
+        for a in alignments:
+            queue.put(a)
+    queue.put(b'0')
+
+
+def align_single_graph(in_graph, in_seqs, is_dna, n_cores, sub_matrix, out_gaf,
+                       gap_score, min_id_score):
+    """
+    This function aligns directly the sequences in FASTA to a graph file given
+    without the need to look at an index
+    """
+    cdef Graph graph
+    cdef vector[string] alignments
+    batch_size = 1000
+    graph = Graph(in_graph)
+
+    processes = []
+    seq_counter = 0
+    queue = mp.Queue()
+    out_gaf = open(out_gaf, "w")
+    seqs_dicts = [dict()]
+    for seq_name, seq in read_fasta_gen(in_seqs):
+
+        if seq_counter != batch_size:  # preparing batch of sequences
+            seqs_dicts[-1][seq_name] = seq
+            seq_counter += 1
+
+        else:
+            seqs_dicts[-1][seq_name] = seq
+            seq_counter = 0
+
+            if len(seqs_dicts) != n_cores:  # we don't have enough batches yet
+                seqs_dicts.append(dict())
+            else:  # we have enough batches to deploy
+                for seqs in seqs_dicts:  # for each batch
+                    p = mp.Process(target=call_align_single, args=(graph, seqs, is_dna, sub_matrix, gap_score,
+                                                                   min_id_score, queue, ))
+                    processes.append(p)
+
+                for p in processes:
+                    p.start()
+
+                n_sentinals = 0
+                while n_sentinals != n_cores:
+                    a = queue.get()
+                    if a == b'0':
+                        n_sentinals += 1
+                    else:
+                        out_gaf.write(a.decode() + "\n")
+
+                for p in processes:
+                    p.join()
+
+                processes = []
+                queue = mp.Queue()
+                n_sentinals = 0
+                seq_counter = 0
+                seqs_dicts = [dict()]
+
+
+    for seqs in seqs_dicts:
+        processes.append(mp.Process(target=call_align_single, args=(graph, seqs, is_dna, sub_matrix, gap_score,
+                                                                    min_id_score, queue,)))
+
+    new_sent_len = len(processes)
+    for p in processes:
+        p.start()
+    n_sentinals = 0
+    while n_sentinals != new_sent_len:
+        a = queue.get()
+        if a == b'0':
+            n_sentinals += 1
+        else:
+            out_gaf.write(a.decode() + "\n")
+
+    for p in processes:
+        p.join()
+
+    out_gaf.close()
+    logging.info("Done!")
+
+
 def make_graph(in_msa, out_directory):
     """
     Generate a GFA file from an MSA and write it to the output directory given
@@ -284,8 +388,6 @@ def process_inputs(args, subcommand):
 def _main(sys_argv, args, msa_name=None):
     cdef Graph graph
     cdef vector[int] sub_matrix
-    cdef vector[string] alignments
-    cdef string a
 
     if args.subcommands is None:
         print("Please provide a subcommand, check -h --help for help.")
@@ -468,6 +570,9 @@ def _main(sys_argv, args, msa_name=None):
             for i in all_linear_sub_matrices["blosum62"]:
                 sub_matrix.push_back(i)
 
+        # process_inputs will return the graph files
+        graph_files = process_inputs(args, args.subcommands)
+
         # checking and loading the index
         if args.index is None:
             exit_error("You did not provide an index file, if you don't have one, please run the build_index subcommand"
@@ -484,8 +589,7 @@ def _main(sys_argv, args, msa_name=None):
         if args.seed_limit < 0:
             exit_error(f"The seed limit you chose {args.seed_limit} cannot be smaller than 0")
 
-        # process_inputs will return the graph files
-        graph_files = process_inputs(args, args.subcommands)
+
         if args.n_cores > os.cpu_count():
             args.n_cores = os.cpu_count()
         graphs = [None] * len(index['files_index'])
@@ -496,9 +600,9 @@ def _main(sys_argv, args, msa_name=None):
         counter = 0
         # loading graphs in a multiprocess
         # graph_batch = []
-        checkpoint = int(len(graph_files)/10)
-        if checkpoint == 0:  # avoiding 0 division later
-            checkpoint = 1
+        # checkpoint = int(len(graph_files)/10)
+        # if checkpoint == 0:  # avoiding 0 division later
+        #     checkpoint = 1
         # initialization
         """
         This used to have a queue and I add the loaded graph to a queue
@@ -540,12 +644,69 @@ def _main(sys_argv, args, msa_name=None):
         # else:
         #     align_dna(graphs, index, graph_files, sub_matrix, args)
 
-        """
-        seems like the good way to do this is to start a p = multiprocessing.Process(target=alignment_fun, args(*args,)
-        then I add this process to some list of processes, then I loop through all these processes in the list and do
-        join on them, so this makes sure that I don't start the big loop (the one with the reads) before all the others
-        finished already
-        
-        this might help me if I decide to write the Gotoh algorithm
-        https://github.com/joachimwolff/algorithmsInBioinformatics/blob/master/Wolff_Presentations/Gotoh.pdf
-        """
+
+    ########################################################## align single #####################################
+
+    if args.subcommands == "align_single":
+        # printing available substitution matrices for the user
+        if args.sub_matrix_list:
+            available_matrices = []
+            for k in all_linear_sub_matrices.keys():
+                available_matrices.append(k)
+            message = f"The following substitution matrices are available: {available_matrices}"
+            print(message)
+            sys.exit(0)
+
+        # repetitive code with align subcommand
+        # But for now it's fine I guess
+        if not 0 <= args.min_id_score <= 1:
+            exit_error("The min alignment identity score needs to be between 0 and 1")
+
+        # checking the substitution matrix the user chose exists or not
+        if not args.sub_matrix in all_linear_sub_matrices:
+            available_matrices = []
+            for k in all_linear_sub_matrices.keys():
+                available_matrices.append(k)
+            message = f"The substitution matrix {args.sub_matrix} is not present in the constants file\n" \
+                      f"The substitution matrix {args.sub_matrix} is not present in the constants file\n" \
+                      f"The following substitution matrices are available: {available_matrices}"
+            exit_error(message)
+        else:
+            for i in all_linear_sub_matrices["blosum62"]:
+                sub_matrix.push_back(i)
+
+        if args.n_cores > os.cpu_count():
+            args.n_cores = os.cpu_count()
+
+        if args.in_graph is None:
+            exit_error("You did not provide a graph to align against")
+        if not os.path.exists(args.in_graph):
+            exit_error(f"The graph file {args.in_graph} does not exist")
+
+        if args.in_seqs is None:
+            exit_error("You did not provide a FASTA file with sequence to align against")
+        if not os.path.exists(args.in_seqs):
+            exit_error(f"The sequence file {args.in_seqs} does not exist")
+        # checks if I can write to the output or not
+        check_output_file(args.out_gaf)
+
+        # takes all the args
+        align_single_graph(args.in_graph, args.in_seqs, args.is_dna, args.n_cores, sub_matrix, args.out_gaf,
+                           args.gap_score, args.min_id_score)
+
+
+    # TODO: I should add a stdout option to output alignments to stdout
+    #     add a cutoff for alignment length as well, not just alignment identity
+    #     i need to stop loading all graphs and only load the ones that have a hit in the index
+    #     not as easy as I thought, as the loading will happen in a separate process so the same graph might get
+    #     loaded several times which is not optimal
+
+    """
+    seems like the good way to do this is to start a p = multiprocessing.Process(target=alignment_fun, args(*args,)
+    then I add this process to some list of processes, then I loop through all these processes in the list and do
+    join on them, so this makes sure that I don't start the big loop (the one with the reads) before all the others
+    finished already
+
+    this might help me if I decide to write the Gotoh algorithm
+    https://github.com/joachimwolff/algorithmsInBioinformatics/blob/master/Wolff_Presentations/Gotoh.pdf
+    """

@@ -66,8 +66,7 @@ cdef class Alignment:
         """
         Outputs alignment in GAF format, either to std output or to a file
         :param graph: is a graph object
-        :param output_file: is an opened file with "w" object
-        :param stdout: boolean to whether to write to stdout or not
+        :param min_id_score: identity score between 0 and 1 to filter the alignment against
         """
         if not self.info:
             logging.error("No GAF for this alignment, the info is {}".format(self.read_name))
@@ -136,7 +135,7 @@ cdef class Alignment:
         # previous = (alignment.info[0]["cigar"], 1)
         previous = []
         cigar = "cg:Z:"
-        # pdb.set_trace()
+        cigar_symbols = {"Match":"=", "Mismatch":"X", "Deletion":"D", "Insertion":"I"}
         for item in self.info:
             if not previous:
                 previous = [item["cigar"], 1]
@@ -144,11 +143,9 @@ cdef class Alignment:
             elif item["cigar"] == previous[0]:
                 previous[1] += 1
             else:
-                cigar += str(previous[1]) + previous[0][0]  # first letter (M, I, D)
+                cigar += str(previous[1]) + cigar_symbols[previous[0]]  # first letter (M, I, D)
                 previous = [item["cigar"], 1]
-
-        # pdb.set_trace()
-        cigar += str(previous[1]) + previous[0][0]
+        cigar += str(previous[1]) + cigar_symbols[previous[0]]
 
         gaf_string.append(cigar)
 

@@ -52,7 +52,7 @@ setup(
     setup_requires=["Cython==0.29.21"],
     tests_require=['pytest'],
     include_package_data=True,
-    python_requires=">=3.3",
+    python_requires=">=3.6",
     packages=find_packages(),
     install_requires=[],
     ext_modules=cythonize("PanPA/*pyx", compiler_directives={"boundscheck": False, "cdivision": True,

@@ -138,6 +138,38 @@ def main():
     aligning.add_argument("--seed_limit", dest="seed_limit", default=3, type=int,
                           help="How many graphs can each seed from the query sequence have hits to, default: 3")
 
+
+    ############################################## Aligning ################################
+
+    align_single = subparsers.add_parser("align_single", help="aligning sequences given to a single graph")
+
+    align_single.add_argument("-g", "--gfa_files", dest="in_graph", type=str, default=None,
+                              help="Input GFA graph to align against")
+
+    align_single.add_argument("-r", "--seqs", metavar="SEQS", dest="in_seqs", default=None,
+                              type=str, help="The input sequences to align in fasta format")
+
+    align_single.add_argument("--dna", dest="is_dna", default=False, action="store_true",
+                          help="Give this flag if the query sequences are DNA and not AA")
+
+    align_single.add_argument("-c", "--cores", metavar="CORES", dest="n_cores", default=1,
+                          type=int, help="Numbers of cores to use for aligning")
+
+    align_single.add_argument("--sub_matrix", dest="sub_matrix", default="blosum62",
+                                 type=str, help="Substitution matrix to use for alignment, default: blosum62")
+
+    align_single.add_argument("--sub_matrix_list", dest="sub_matrix_list", default=False, action="store_true",
+                          help="When given, a list of possible substitution matrices will be given")
+
+    align_single.add_argument("-o", "--out_gaf", metavar="GAF", dest="out_gaf", default="alignments.gaf",
+                          type=str, help="Output alignments file path")
+
+    align_single.add_argument("--gap_score", dest="gap_score", default=-3, type=int,
+                          help="The gap score to use for the alignment, default: -3")
+
+    align_single.add_argument("--min_id_score", dest="min_id_score", default=0.7, type=float,
+                          help="minimum alignment identity score for the alignment to be outputted, [0,1]")
+
     args = parser.parse_args()
 
     if len(sys.argv) == 1:
