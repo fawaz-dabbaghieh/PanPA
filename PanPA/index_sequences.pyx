@@ -1,8 +1,8 @@
 # distutils: language=c++
 
 from collections import namedtuple, deque
-import pickle
-import sys
+from PanPA.reverse_complement_fast import reverse_complement
+from PanPA.translate_read import translate
 # from libcpp.deque cimport deque
 
 
@@ -179,7 +179,7 @@ def sort_index_and_limit(seed_index, seed_membership_limit):
 
 
 
-def query_sequence(seq, seed_index, index_info):
+def query_aa_sequence(seq, seed_index, index_info):
     """
     :param seq: a sequence that will be aligned
     :param index: the seed index dictionary
@@ -197,6 +197,43 @@ def query_sequence(seq, seed_index, index_info):
         kmer = index_info["ksize"]
         for seed in extract_kmers(seq, kmer):
             seeds.append(seed)
+
+    # I count which graphs are mostly represented and order them based on the counts
+    matches = dict()
+    for seed in seeds:
+        if seed in seed_index:
+            for g in seed_index[seed]:
+                if g not in matches:
+                    matches[g] = 1
+                else:
+                    matches[g] += 1
+
+    return sorted(matches, key=lambda k: matches[k], reverse=True)  # returns a sorted list
+
+
+def query_dna_sequence(seq, seed_index, index_info):
+    """
+    :param seq: a sequence that will be aligned
+    :param seed_index: the seed index dictionary
+    :param index_info: a dictionary containing the information about the index
+    """
+
+    reading_frames = translate(seq)
+    # print(reading_frames)
+    method = index_info["type"]
+    seeds = []
+    # extracting seeds from all 3 frames in one direction
+    for frame, frame_seq in reading_frames.items():
+        # print(f"The frame is {frame} and the AA sequence is {frame_seq}")
+        if method == "wk_min":
+            kmer = index_info["ksize"]
+            window = index_info["wsize"]
+            for seed in wk_minimizer_deque(frame_seq, kmer, window):
+                seeds.append(seed)
+        else:  # k_mers
+            kmer = index_info["ksize"]
+            for seed in extract_kmers(frame_seq, kmer):
+                seeds.append(seed)
 
     # I count which graphs are mostly represented and order them based on the counts
     matches = dict()

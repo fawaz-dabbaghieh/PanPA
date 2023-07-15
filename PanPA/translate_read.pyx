@@ -11,7 +11,7 @@ or a stop codon.  These are translated as "X".  Any invalid codon
 (e.g. "TA?" or "T-A") will throw an error.
 """
 def inner_loop(seq):
-    translations = ["", "", ""]
+    translations = [[], [], []]
     cdef int n, i, j
     n = len(seq)
     for i in range(0, n - n % 3, 3):
@@ -24,16 +24,20 @@ def inner_loop(seq):
                 continue
             codon = seq[start:end].upper()
 
+            # todo I can remove these conditions if I use my linearized translation table
             if "N" in codon:
-                translations[j] += "X"  # we don't know what amino acid
+                translations[j].append("X")  # we don't know what amino acid
             elif translation_table[codon] == "_":  # stop codon
-                translations[j] += '['
+                translations[j].append('[')
             elif codon not in translation_table:
-                logging.warning(
-                    "Warning! Codon {} not found in the translation table and X is used for this codon".format(codon))
-                translations[j] += "X"
+                logging.warning("Warning! Codon {} not found in the translation "
+                                "table and X is used for this codon".format(codon))
+                translations[j].append("X")
             else:
-                translations[j] += translation_table[codon]
+                translations[j].append(translation_table[codon])
+
+    for i in range(3):
+        translations[i] = "".join(translations[i])
     return translations
 
 
@@ -47,13 +51,13 @@ def translate(seq):
     """
 
     if not seq:
-        return "", "", 0
+        return dict()
 
-    reverse_seq = reverse_complement(seq)
+    # reverse_seq = reverse_complement(seq)
     reading_frames = inner_loop(seq)
-    reading_frames_reverse = inner_loop(reverse_seq)
-    reading_frames = {1: reading_frames[0], 2: reading_frames[1], 3: reading_frames[2],
-                      -1: reading_frames_reverse[0], -2: reading_frames_reverse[1], -3: reading_frames_reverse[2]}
+    # print(reading_frames)
+    # reading_frames_reverse = inner_loop(reverse_seq)
+    reading_frames = {1: reading_frames[0], 2: reading_frames[1], 3: reading_frames[2]}
 
     return reading_frames
 

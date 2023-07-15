@@ -1,16 +1,19 @@
 # distutils: language=c++
+import sys
 import os
 import logging
+import pickle
+import multiprocessing as mp
+from PanPA.reverse_complement_fast import reverse_complement
+from libcpp.vector cimport vector
+from libcpp.string cimport string
 from PanPA.Graph cimport Graph
 from PanPA.read_fasta import read_fasta, read_fasta_gen
 from PanPA.graph_from_msa import msa_graph
 from PanPA.index_sequences import *
 from PanPA.graph_smith_waterman cimport align_to_graph_sw
+from PanPA.graph_smith_waterman_frameshift_aware cimport align_to_graph_sw_fsa
 from PanPA.constants import all_linear_sub_matrices
-from PanPA.translate_read import translate
-from libcpp.vector cimport vector
-import multiprocessing as mp
-from libcpp.string cimport string
 
 
 def exit_error(message):
@@ -22,14 +25,14 @@ def exit_error(message):
 def check_output_file(output_file):
     if os.path.exists(output_file):
         exit_error(f"The file {output_file} already exists, not going to overwrite it")
-    try:
-        test = open(output_file, "w")
-        test.close()
-    except PermissionError:
-        exit_error(f"Was not able to create {output_file}, permission denied")
-
-    if os.path.exists(output_file):
-        os.remove(output_file)
+    else:
+        try:
+            test = open(output_file, "w")
+            test.close()
+        except PermissionError:
+            exit_error(f"Was not able to create {output_file}, permission denied")
+        except MemoryError as e:
+            exit_error(f"There was a memory error {e}")
 
 
 def check_existance(files):
@@ -47,9 +50,8 @@ def check_existance(files):
         files.remove(f)
 
 
-def align_to_graph(seqs_dict, graphs, graph_files, sub_matrix,
-                   gap_score, seed_index, index_info, seed_limit, min_id_score, queue, printdp,
-                   dna):
+def align_to_graph(seqs_dict, graphs, graph_files, sub_matrix, gap_score, fs_score,
+                   seed_index, index_info, seed_limit, min_id_score, queue, printdp, dna):
     """
     Takes a dict with several reads and their names, and align them and add them to the queue
     """
@@ -58,28 +60,55 @@ def align_to_graph(seqs_dict, graphs, graph_files, sub_matrix,
     cdef vector[string] alignments
     cdef int gap_s = gap_score
     cdef string a
+    cdef int fs_s = fs_score
+    # this maps a codon to an amino acid with ord(A)-65
+    # ACTG are mapped with neucleotide_to_int to integers 01234
+    # so for a codon like AGT we use codon_translate_0base[0][3][2] and we'll get an int
+    # to turn the int back to an amino acid, e.g. chr(codon_translate_0base[0][3][2]+65)
+    # and we'll get the amino acid S
+    cdef vector[vector[vector[int]]] codon_translate_0base = [
+        [[10, 13, 13, 10, 23], [19, 19, 19, 19, 23], [8, 8, 8, 12, 23], [17, 18, 18, 17, 23], [23, 23, 23, 23, 23]],
+        [[16, 7, 7, 16, 23], [15, 15, 15, 15, 23], [11, 11, 11, 11, 23], [17, 17, 17, 17, 23], [23, 23, 23, 23, 23]],
+        [[26, 24, 24, 26, 23], [18, 18, 18, 18, 23], [11, 5, 5, 11, 23], [26, 2, 2, 22, 23], [23, 23, 23, 23, 23]],
+        [[4, 3, 3, 4, 23], [0, 0, 0, 0, 23], [21, 21, 21, 21, 23], [6, 6, 6, 6, 23], [23, 23, 23, 23, 23]],
+        [[23, 23, 23, 23, 23], [23, 23, 23, 23, 23], [23, 23, 23, 23, 23], [23, 23, 23, 23, 23], [23, 23, 23, 23, 23]]]
+    cdef vector[int] neucleotide_to_int = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                                           0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                                           0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0,
+                                           4, 0, 0, 0, 0, 0, 2]
+
     # cdef vector[string] alignments_vec
     print_dp = printdp
-
     # if DNA is true, then instead of going through each seq I go through each seq's frames and add
     # that frame to the alignment output with RF:i:value (values are 1,2,3,-1,-2,-3)
-    # todo need to remove this and just make it align any sequence to graphs
-    #    this would solve the issue of aligning DNA to DNA graphs
-    #    then when --dna is given, then I do the frameshift aware one
-    frames_to_bytes = {1:b"1", 2:b"2", 3:b"3", -1:b"-1", -2:b"-2", -3:b"-3"}
-    for seq_name, seq in seqs_dict.items():
+    # frames_to_bytes = {1:b"1", 2:b"2", 3:b"3", -1:b"-1", -2:b"-2", -3:b"-3"}
+    for s_name, s in seqs_dict.items():
+        current_seq = dict()
         if dna:
-            reading_frames = translate(seq)
+            reverse = reverse_complement(s)
+            current_seq = {0:[s_name, s], 1:[s_name, reverse]}
         else:
-            reading_frames = {0:seq}  # just a dict with one sequences
+            current_seq = {0:[s_name, s]}
+        #     reading_frames = translate(seq)
+        # else:
+        #     reading_frames = {0:seq}  # just a dict with one sequences
 
-        for frame, seq in reading_frames.items():
-            matches = query_sequence(seq, seed_index, index_info)
+        # for frame, seq in reading_frames.items():
+        for frame, content in current_seq.items():
+            # print(f"I am at frame {frame} with content {content}")
+            seq_name = content[0]
+            seq = content[1]
+            if dna:
+                # todo need to think whether to exclude the forward or the reverse
+                #   because in theory, one of them must be the correct one
+                matches = query_dna_sequence(seq, seed_index, index_info)
+                # print(matches)
+            else:
+                matches = query_aa_sequence(seq, seed_index, index_info)
             # print(matches)
-            if 0 < seed_limit < len(matches):  # if seed_limit is 0 then
+            if 0 < seed_limit < len(matches):
                 # keeping only the seeds up to the limit
                 matches = matches[0:seed_limit]
-
             if matches:
                 for i in matches:
                     if graphs[i] is None:
@@ -87,15 +116,26 @@ def align_to_graph(seqs_dict, graphs, graph_files, sub_matrix,
                         continue
                     graph = graphs[i]
                     # print(f"going to align {seq_name} to {graph.name}")
-                    alignments = align_to_graph_sw(graph, seq, seq_name, print_dp, sub_matrix, gap_s, min_id_score)
+                    if dna:
+                        alignments = align_to_graph_sw_fsa(graph, seq, seq_name, print_dp, sub_matrix,
+                                                           gap_s, fs_s, min_id_score, codon_translate_0base,
+                                                           neucleotide_to_int)
+                    else:
+                        alignments = align_to_graph_sw(graph, seq, seq_name, print_dp, sub_matrix,
+                                                       gap_s, min_id_score)
                     # print(f"aligned {seq_name} to graph {i} and got {alignments.size()} alignments back")
                     # if I wanted to add another tag, I can do it here with the frame translation
                     # I mean add it for each alignment
+                    # for a in alignments:
+                    #     queue.put(a)
                     for a in alignments:
-                        if frame == 0:  # it's a protein sequence
+                        if not dna:  # it's a protein sequence
                             queue.put(a)
-                        else:  # it's a DNA sequence with a frame
-                            queue.put(a + b"\tRF:i:" + frames_to_bytes[frame])
+                        else:  # it's a DNA and could be reversed
+                            if frame == 0:
+                                queue.put(a + b"\tDNA:Z:forward")
+                            else:
+                                queue.put(a + b"\tRF:Z:reverse")
                     # if not reading_frame:
                     #     queue.put(a)
                     # else:
@@ -107,12 +147,12 @@ def align_to_graph(seqs_dict, graphs, graph_files, sub_matrix,
                     #     alignments_vec.push_back(a)
                     # print(f"It took {time.perf_counter() - start} to align {seq_name} with length {len(seq)}")
 
-            # for a in alignments_vec:
-            #     queue.put(a)
+                # for a in alignments_vec:
+                #     queue.put(a)
     queue.put(b'0')  # sentinel
 
 
-def align_aa(graphs, index, graph_files, sub_matrix, args):
+def align(graphs, index, graph_files, sub_matrix, args):
     seed_index = index['seed_index']
     index_info = index['index_info']
     files_index = index['files_index']
@@ -152,8 +192,10 @@ def align_aa(graphs, index, graph_files, sub_matrix, args):
                     #  gap_score, seed_index, index_info, seed_limit, min_id_score, queue, printdp,
                     #  dna)
                     # I can also add the reading frame now, which is a binary string
+                    # def align_to_graph(seqs_dict, graphs, graph_files, sub_matrix, gap_score, fs_score,
+                    #                    seed_index, index_info, seed_limit, min_id_score, queue, printdp, dna):
                     p = mp.Process(target=align_to_graph, args=(seqs, graphs, graph_files,
-                                                                sub_matrix, args.gap_score, seed_index, index_info,
+                                                                sub_matrix, args.gap_score, args.fs_score, seed_index, index_info,
                                                                 args.seed_limit, args.min_id_score, queue, False, dna,))
                     processes.append(p)
 
@@ -184,8 +226,8 @@ def align_aa(graphs, index, graph_files, sub_matrix, args):
     # leftovers
     for seqs in seqs_dicts:
         processes.append(mp.Process(target=align_to_graph, args=(seqs, graphs, graph_files,
-                                                                 sub_matrix, args.gap_score, seed_index, index_info,
-                                                                 args.seed_limit, args.min_id_score, queue,False, dna,)))
+                                                                 sub_matrix, args.gap_score, args.fs_score, seed_index, index_info,
+                                                                args.seed_limit, args.min_id_score, queue, False, dna,)))
     new_sent_len = len(processes)
     for p in processes:
         p.start()
@@ -220,28 +262,73 @@ def load_graph(graph_file, graph_n, graphs, lock):
         lock.release()
 
 
-def call_align_single(in_graph, in_seqs, is_dan, sub_matrix, gap_score, min_id_score, queue):
+def call_align_single(in_graph, seqs_dict, is_dna, sub_matrix, gap_score, fs_score, min_id_score, queue):
     cdef Graph graph
     cdef bint print_dp = False
     cdef vector[string] alignments
     cdef int gap_s = gap_score
     cdef string a
-
+    cdef int fs_s = fs_score
+    # this maps a codon to an amino acid with ord(A)-65
+    # ACTG are mapped with neucleotide_to_int to integers 01234
+    # so for a codon like AGT we use codon_translate_0base[0][3][2] and we'll get an int
+    # to turn the int back to an amino acid, e.g. chr(codon_translate_0base[0][3][2]+65)
+    # and we'll get the amino acid S
+    cdef vector[vector[vector[int]]] codon_translate_0base = [
+        [[10, 13, 13, 10, 23], [19, 19, 19, 19, 23], [8, 8, 8, 12, 23], [17, 18, 18, 17, 23], [23, 23, 23, 23, 23]],
+        [[16, 7, 7, 16, 23], [15, 15, 15, 15, 23], [11, 11, 11, 11, 23], [17, 17, 17, 17, 23], [23, 23, 23, 23, 23]],
+        [[26, 24, 24, 26, 23], [18, 18, 18, 18, 23], [11, 5, 5, 11, 23], [26, 2, 2, 22, 23], [23, 23, 23, 23, 23]],
+        [[4, 3, 3, 4, 23], [0, 0, 0, 0, 23], [21, 21, 21, 21, 23], [6, 6, 6, 6, 23], [23, 23, 23, 23, 23]],
+        [[23, 23, 23, 23, 23], [23, 23, 23, 23, 23], [23, 23, 23, 23, 23], [23, 23, 23, 23, 23], [23, 23, 23, 23, 23]]]
+    cdef vector[int] neucleotide_to_int = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                                           0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                                           0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0,
+                                           4, 0, 0, 0, 0, 0, 2]
     graph = in_graph
 
-    for seq_name, seq in in_seqs.items():
-        alignments = align_to_graph_sw(graph, seq, seq_name, print_dp, sub_matrix, gap_score, min_id_score)
-        for a in alignments:
-            queue.put(a)
+    for s_name, s in seqs_dict.items():
+        current_seq = dict()
+        if is_dna:
+            reverse = reverse_complement(s)
+            current_seq = {0:[s_name, s], 1:[s_name, reverse]}
+        else:
+            current_seq = {0:[s_name, s]}
+        for frame, content in current_seq.items():
+            # print(f"going to align {content}")
+            seq_name = content[0]
+            seq = content[1]
+            if is_dna:
+                # print(f"sending {seq} to graph aligner")
+                alignments = align_to_graph_sw_fsa(graph, seq, seq_name, print_dp, sub_matrix,
+                                                   gap_s, fs_s, min_id_score, codon_translate_0base,
+                                                   neucleotide_to_int)
+                # print(f"Alignments we got were {alignments}")
+            else:
+                alignments = align_to_graph_sw(graph, seq, seq_name, print_dp, sub_matrix, gap_score, min_id_score)
+
+            for a in alignments:
+                if not is_dna:  # it's a protein sequence
+                    queue.put(a)
+                else:  # it's a DNA and could be reversed
+                    if frame == 0:
+                        # print(f"trying to add {a} to the queue")
+                        queue.put(a + b"\tDNA:Z:forward")
+                        # print(f"added {a} to the queue")
+                    else:
+                        # print(f"trying to add {a} to the queue")
+                        queue.put(a + b"\tRF:Z:reverse")
+                        # print(f"added {a} to the queue")
+
     queue.put(b'0')
 
 
 def align_single_graph(in_graph, in_seqs, is_dna, n_cores, sub_matrix, out_gaf,
-                       gap_score, min_id_score):
+                       gap_score, fs_score, min_id_score):
     """
     This function aligns directly the sequences in FASTA to a graph file given
-    without the need to look at an index
+    without the need to look at an index, but only aligns to one single target GFA
     """
+
     cdef Graph graph
     cdef vector[string] alignments
     batch_size = 1000
@@ -253,7 +340,6 @@ def align_single_graph(in_graph, in_seqs, is_dna, n_cores, sub_matrix, out_gaf,
     out_gaf = open(out_gaf, "w")
     seqs_dicts = [dict()]
     for seq_name, seq in read_fasta_gen(in_seqs):
-
         if seq_counter != batch_size:  # preparing batch of sequences
             seqs_dicts[-1][seq_name] = seq
             seq_counter += 1
@@ -266,8 +352,10 @@ def align_single_graph(in_graph, in_seqs, is_dna, n_cores, sub_matrix, out_gaf,
                 seqs_dicts.append(dict())
             else:  # we have enough batches to deploy
                 for seqs in seqs_dicts:  # for each batch
+                    # def call_align_single(in_graph, seqs_dict, is_dna, sub_matrix, gap_score, fs_score, min_id_score, queue):
+
                     p = mp.Process(target=call_align_single, args=(graph, seqs, is_dna, sub_matrix, gap_score,
-                                                                   min_id_score, queue, ))
+                                                                   fs_score, min_id_score, queue, ))
                     processes.append(p)
 
                 for p in processes:
@@ -290,10 +378,10 @@ def align_single_graph(in_graph, in_seqs, is_dna, n_cores, sub_matrix, out_gaf,
                 seq_counter = 0
                 seqs_dicts = [dict()]
 
+    for seqs in seqs_dicts:  # leftovers
 
-    for seqs in seqs_dicts:
         processes.append(mp.Process(target=call_align_single, args=(graph, seqs, is_dna, sub_matrix, gap_score,
-                                                                    min_id_score, queue,)))
+                                                                    fs_score, min_id_score, queue,)))
 
     new_sent_len = len(processes)
     for p in processes:
@@ -554,6 +642,8 @@ def _main(sys_argv, args, msa_name=None):
             print(message)
             sys.exit(0)
 
+        check_output_file(args.out_gaf)
+
         if not 0 <= args.min_id_score <= 1:
             exit_error("The min alignment identity score needs to be between 0 and 1")
 
@@ -569,9 +659,6 @@ def _main(sys_argv, args, msa_name=None):
         else:
             for i in all_linear_sub_matrices["blosum62"]:
                 sub_matrix.push_back(i)
-
-        # process_inputs will return the graph files
-        graph_files = process_inputs(args, args.subcommands)
 
         # checking and loading the index
         if args.index is None:
@@ -589,6 +676,8 @@ def _main(sys_argv, args, msa_name=None):
         if args.seed_limit < 0:
             exit_error(f"The seed limit you chose {args.seed_limit} cannot be smaller than 0")
 
+        # process_inputs will return the graph files
+        graph_files = process_inputs(args, args.subcommands)
 
         if args.n_cores > os.cpu_count():
             args.n_cores = os.cpu_count()
@@ -621,7 +710,7 @@ def _main(sys_argv, args, msa_name=None):
 
         # graphs = []
         for f in graph_files:
-            logging.info(f"Loading the graph {f}")
+            logging.info(f"Loading graph {f}")
             graph = Graph(gfa_file=f)
             f_name = ".".join(f.split(os.sep)[-1].split(".")[:-1])
             idx = index["files_index"][f_name]
@@ -637,7 +726,7 @@ def _main(sys_argv, args, msa_name=None):
         # that this is a DNA sequence and I add the reading frame info the the seq name
         # so align_to_graph_ss extracts the reading frame name and adds it to the alignment
         # output if there was an alignment output
-        align_aa(graphs, index, graph_files, sub_matrix, args)
+        align(graphs, index, graph_files, sub_matrix, args)
         # if not args.is_dna:
         #     # print("going into align_aa")
         #     align_aa(graphs, index, graph_files, sub_matrix, args)
@@ -692,7 +781,7 @@ def _main(sys_argv, args, msa_name=None):
 
         # takes all the args
         align_single_graph(args.in_graph, args.in_seqs, args.is_dna, args.n_cores, sub_matrix, args.out_gaf,
-                           args.gap_score, args.min_id_score)
+                           args.gap_score, args.fs_score, args.min_id_score)
 
 
     # TODO: I should add a stdout option to output alignments to stdout

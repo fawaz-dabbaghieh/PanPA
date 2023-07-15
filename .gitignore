@@ -6,6 +6,7 @@ __pycache__/
 *.html
 
 testing/
+fs_env/
 
 dna_alignment_test/
 # compiled scripts

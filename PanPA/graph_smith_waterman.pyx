@@ -302,12 +302,15 @@ cdef vector[string] align_to_graph_sw(Graph graph, str read,str read_name, bint 
     ###############################################################################################
     # finding the max scores and coordinates in the DP table to traceback these best alignments
     for i in range(dimensions):
-        if dp_table[i] > global_max:
-            global_max = dp_table[i]
-            global_max_coord.clear()
-            global_max_coord.push_back(i)
-        elif dp_table[i] == global_max:
-            global_max_coord.push_back(i)
+        # had to add the > 0 check because on rare occasions, if the read being aligned really have nothing matching
+        # the algorithm for some reason was getting stuck
+        if dp_table[i] > 0:
+            if dp_table[i] > global_max:
+                global_max = dp_table[i]
+                global_max_coord.clear()
+                global_max_coord.push_back(i)
+            elif dp_table[i] == global_max:
+                global_max_coord.push_back(i)
 
     # print(f"The max location in matrix is {global_max_coord} and the score is {global_max}")
     # traceback now
@@ -331,34 +334,61 @@ cdef vector[string] align_to_graph_sw(Graph graph, str read,str read_name, bint 
             # print("current: coord, i, j", coord, i, j)
 
             back_coord = traceback_table[coord]
-            back_i = back_coord / (graph_seq_len + 1)
+            back_i = back_coord // (graph_seq_len + 1)
             back_j = back_coord % (graph_seq_len + 1)
 
+            # self.info.append({"node_id": node_id, "node_pos": node_pos, "node_str": node_str,
+            #               "read_pos": read_pos, "read_str": read_str, "cigar": cigar})
             if back_j == j:  # insertion
                 # print("insertion")
-                alignment.add_alignment(j_node[j - 1], -1, j_pos[j-1], read_as_int[i - 1], i - 1)
+                # alignment.add_alignment(j_node[j - 1], -1, j_pos[j-1], read_as_int[i - 1], i - 1)
+                alignment.info.append(
+                    {"node_id": j_node[j - 1], "node_pos": j_pos[j - 1], "node_str": "_", "read_pos": i - 1,
+                     "read_str": read[i - 1], "type": 0})
+                alignment.path.append(j_node[j - 1])
+                alignment.n_indels += 1
+
             elif back_i == i:  # deletion
                 # print("deletion")
-                alignment.add_alignment(j_node[j - 1], all_seq_as_int[j-1], j_pos[j - 1], -1, i - 1)
-            else:  # match or miss
+                # alignment.add_alignment(j_node[j - 1], all_seq_as_int[j-1], j_pos[j - 1], -1, i - 1)
+                alignment.info.append(
+                    {"node_id": j_node[j - 1], "node_pos": j_pos[j - 1], "node_str": chr(all_seq_as_int[j - 1] + 65),
+                     "read_pos": i - 1, "read_str": "_", "type": 1})
+                alignment.path.append(j_node[j - 1])
+                alignment.n_indels += 1
+
+            elif back_i == i - 1:  # match or miss
                 # print("match or mismatch")
-                alignment.add_alignment(j_node[j-1], all_seq_as_int[j-1], j_pos[j-1], read_as_int[i - 1], i - 1)
+                graph_character = chr(all_seq_as_int[j - 1] + 65)
+                if graph_character == read[i - 1]:
+                    cigar = 2
+                    alignment.n_matches += 1
+                else:
+                    cigar = 3
+                    alignment.n_mismatches += 1
+                alignment.info.append(
+                    {"node_id": j_node[j - 1], "node_pos": j_pos[j - 1], "node_str": graph_character, "read_pos": i - 1,
+                     "read_str": read[i - 1], "type": cigar})
+                alignment.path.append(j_node[j - 1])
+
+            else:  # I came from 0 so I stop the traceback
+                break
+                # alignment.add_alignment(j_node[j-1], all_seq_as_int[j-1], j_pos[j-1], read_as_int[i - 1], i - 1)
 
             i = back_i
             j = back_j
             coord = back_coord
 
-        alignment.prepare_gaf(graph, min_id_score)
-        alignment_score = alignment.id_score
+        alignment.prepare_aa_gaf(graph)
+        # alignment_score = alignment.id_score
         # print(f"the alignment score is {alignment_score} and the min id is {min_id_score}")
-        if alignment_score >= min_id_score:
+        if alignment.id_score >= min_id_score:
             alignments.push_back(alignment.gaf.encode())
 
     # need to free the memory, otherwise major memory leaks
     free(dp_table)
     free(traceback_table)
     return alignments
-
 
 ############################################################ gotoh algorithm, affine gap
 """
