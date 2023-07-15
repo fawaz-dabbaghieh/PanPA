@@ -25,6 +25,7 @@ PanPA/reverse_complement_fast.c
 PanPA/running_test.cpp
 PanPA/smith_waterman.cpp
 PanPA/translate_read.cpp
+PanPA/graph_smith_waterman_frameshift_aware.cpp
 
 # C extensions
 *.so
