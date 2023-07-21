@@ -7,6 +7,7 @@ __pycache__/
 
 testing/
 fs_env/
+graph_update/
 
 dna_alignment_test/
 # compiled scripts
@@ -26,6 +27,7 @@ PanPA/running_test.cpp
 PanPA/smith_waterman.cpp
 PanPA/translate_read.cpp
 PanPA/graph_smith_waterman_frameshift_aware.cpp
+
 
 # C extensions
 *.so

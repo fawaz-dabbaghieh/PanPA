@@ -334,6 +334,7 @@ def align_single_graph(in_graph, in_seqs, is_dna, n_cores, sub_matrix, out_gaf,
     batch_size = 1000
     graph = Graph(in_graph)
 
+
     processes = []
     seq_counter = 0
     queue = mp.Queue()

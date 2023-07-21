@@ -10,7 +10,6 @@ from PanPA.Node cimport Node
 
 
 cdef class Graph:
-
     def __init__(self, gfa_file=None, paths=False, nodes=None):
         """
         If the gfa_file path is given, then the graph is initialized with that gfa graph
@@ -405,15 +404,18 @@ cdef class Graph:
                 # assuming all forward nodes here because directed aa graph (no reverse complement)
                 # and the graph represent the protein (from beginning to end of MSA)
                 e = e.strip().split()
-                parent = self.nodes[int(e[1])]
-                child = self.nodes[int(e[3])]
-                if (parent.identifier in self.nodes) and (child.identifier in self.nodes):
-                    # only add child because it a DAG
-                    # and add_child will take care of filling in and out nodes
-                    parent.add_child(child)
-                    # self.nodes[parent].add_child(self.nodes[child])
-                    # self.nodes[parent].out_nodes.add(child)
-                    # self.nodes[child].in_nodes.add(parent)
+                # might be hacky, but I'm only taking forward edges
+                # as I am assuming only DAGs
+                if e[2] == "+" and e[4] == "+":
+                    parent = self.nodes[int(e[1])]
+                    child = self.nodes[int(e[3])]
+                    if (parent.identifier in self.nodes) and (child.identifier in self.nodes):
+                        # only add child because it a DAG
+                        # and add_child will take care of filling in and out nodes
+                        parent.add_child(child)
+                        # self.nodes[parent].add_child(self.nodes[child])
+                        # self.nodes[parent].out_nodes.add(child)
+                        # self.nodes[child].in_nodes.add(parent)
 
     cdef void write_gfa(self, str gfa_path) except *:
         """
