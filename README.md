@@ -5,6 +5,7 @@
     + [Building Index](#building-index)
     + [Building Graphs](#building-graphs)
     + [Aligning](#aligning)
+    + [Align to single target](#align-to-single-target)
 
 # PanPA
 
@@ -102,25 +103,32 @@ optional arguments:
 For aligning query sequences to the graphs, you need to give three main inputs to the subcommand `align`:
 the index that was built with `--index`, the input graphs which can be a directory, a text file with list, or
 given directly in the command, and finally the query sequences in FASTA. If DNA sequences
-are given, then the user needs to use the flag `--dna`. The user can also
+are given, and would like to align the DNA against amino acids, then the user needs to use the flag `--dna`. The user can also
 specify the substitution matrix to use for the alignment, or print a list of possible matrices with
 `--sub_matrix_list`. The user can also specify a certain gap score with `--gap_score`, a cutoff on alignment id with
 `--min_id_score`, and can set a limit to how many graphs to align to with `--seed_limit`.
+#### DNA to DNA
+If the user would like to build graphs from DNA sequences and align other DNA sequences back, this can be done with PanPA. However
+after building the graphs from the MSA, when aligning, no need to use `--dna` argument,
+because this argument then tries to apply the frameshift-aware alignment algorithm, and use 
+`--sub_matrix dna` which basically becomes edit distance scoring.
 
-This step can be made faster by giving more cores.
 
-The output alignment are in GAF format. To learn more about this format please check here
+The output alignments are in GAF format, more about it on [Readthedocs](https://panpa-readthedocs.readthedocs.io/en/latest/index.html)
 ```
-usage: PanPA align [-h] [-g IN_FILES [IN_FILES ...]] [-l IN_LIST] [-d GRAPHS] [--index INDEX] [-r SEQS] [--dna]
-                            [-c CORES] [--sub_matrix SUB_MATRIX] [--sub_matrix_list] [-o GAF] [--gap_score GAP_SCORE]
-                            [--min_id_score MIN_ID_SCORE] [--seed_limit SEED_LIMIT]
+usage: PanPA align [-h] [-g IN_FILES [IN_FILES ...]] [-l IN_LIST] [-d GRAPHS]
+                   [--index INDEX] [-r SEQS] [--dna] [-c CORES]
+                   [--sub_matrix SUB_MATRIX] [--sub_matrix_list] [-o GAF]
+                   [--gap_score GAP_SCORE] [--min_id_score MIN_ID_SCORE]
+                   [--fs_score FS_SCORE] [--seed_limit SEED_LIMIT]
 
-optional arguments:
+options:
   -h, --help            show this help message and exit
   -g IN_FILES [IN_FILES ...], --gfa_files IN_FILES [IN_FILES ...]
                         Input GFA graphs, one or more file space-separated
   -l IN_LIST, --gfa_list IN_LIST
-                        a text file with all input graphs paths each on one new line
+                        a text file with all input graphs paths each on one new
+                        line
   -d GRAPHS, --in_dir GRAPHS
                         Path to directory with GFA files
   --index INDEX         Path to pickled index file generated in the build step
@@ -129,15 +137,55 @@ optional arguments:
   -c CORES, --cores CORES
                         Numbers of cores to use for aligning
   --sub_matrix SUB_MATRIX
-                        Substitution matrix to use for alignment, default: blosum62
-  --sub_matrix_list     When given, a list of possible substitution matrices will be given
+                        Substitution matrix to use for alignment, default:
+                        blosum62
+  --sub_matrix_list     When given, a list of possible substitution matrices will
+                        be given
   -o GAF, --out_gaf GAF
                         Output alignments file path
   --gap_score GAP_SCORE
                         The gap score to use for the alignment, default: -3
   --min_id_score MIN_ID_SCORE
-                        minimum alignment identity score for the alignment to be outputted, [0,1]
+                        minimum alignment identity score for the alignment to be
+                        outputted, [0,1]
+  --fs_score FS_SCORE   The frameshift penalty when aligning DNA to amino acids,
+                        default: -3
   --seed_limit SEED_LIMIT
-                        How many graphs can each seed from the query sequence have hits to, default: 3
+                        How many graphs can each seed from the query sequence
+                        have hits to, default: 3
+```
 
+### Align to Single Target
+PanPA also have `align_single` subcommand which allows the user to align query sequences
+against one graph, which also avoids the indexing and seed extraction step and just aligns the query
+sequences against the given graph. Similar to Align, can also be done
+
+```
+usage: PanPA align_single [-h] [-g IN_GRAPH] [-r SEQS] [--dna]
+                          [--min_id_score MIN_ID_SCORE] [-c CORES]
+                          [--sub_matrix SUB_MATRIX] [--sub_matrix_list] [-o GAF]
+                          [--gap_score GAP_SCORE] [--fs_score FS_SCORE]
+
+options:
+  -h, --help            show this help message and exit
+  -g IN_GRAPH, --gfa_files IN_GRAPH
+                        Input GFA graph to align against
+  -r SEQS, --seqs SEQS  The input sequences to align in fasta format
+  --dna                 Give this flag if the query sequences are DNA and not AA
+  --min_id_score MIN_ID_SCORE
+                        minimum alignment identity score for the alignment to be
+                        outputted, [0,1]
+  -c CORES, --cores CORES
+                        Numbers of cores to use for aligning
+  --sub_matrix SUB_MATRIX
+                        Substitution matrix to use for alignment, default:
+                        blosum62
+  --sub_matrix_list     When given, a list of possible substitution matrices will
+                        be given
+  -o GAF, --out_gaf GAF
+                        Output alignments file path
+  --gap_score GAP_SCORE
+                        The gap score to use for the alignment, default: -3
+  --fs_score FS_SCORE   The frameshift penalty when aligning DNA to amino acids,
+                        default: -3
 ```
