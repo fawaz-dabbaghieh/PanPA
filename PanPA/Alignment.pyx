@@ -111,7 +111,7 @@ cdef class Alignment:
         gaf_string.append(cigar)
 
         # adding graph name as an extra tag
-        gaf_string.append(f"gid:Z:{graph.name}")
+        gaf_string.append(f"GR:Z:{graph.name}")
 
         self.gaf = "\t".join([str(x) for x in gaf_string])
 
@@ -206,6 +206,6 @@ cdef class Alignment:
         gaf_string.append(cigar)
 
         # adding graph name as an extra tag
-        gaf_string.append(f"gid:Z:{graph.name}")
+        gaf_string.append(f"GR:Z:{graph.name}")
 
         self.gaf = "\t".join([str(x) for x in gaf_string])
