@@ -109,12 +109,17 @@ def align_to_graph(seqs_dict, graphs, graph_files, sub_matrix, gap_score, fs_sco
             if 0 < seed_limit < len(matches):
                 # keeping only the seeds up to the limit
                 matches = matches[0:seed_limit]
+
+            print(f"The matches are {matches}")
+
             if matches:
                 for i in matches:
                     if graphs[i] is None:
                         logging.warning("There's a seed without a matching graph")
                         continue
+
                     graph = graphs[i]
+                    print(f"aligning to graph {graph.name}")
                     # print(f"going to align {seq_name} to {graph.name}")
                     if dna:
                         alignments = align_to_graph_sw_fsa(graph, seq, seq_name, print_dp, sub_matrix,
@@ -410,8 +415,9 @@ def make_graph(in_msa, out_directory):
     sequences = read_fasta(in_msa)
     graph = msa_graph(sequences)
 
-    graph_name = ".".join(in_msa.split(os.sep)[-1].split(".")[:-1])
-    graph_loc = os.path.join(out_directory, graph_name + ".gfa")
+    # graph_name = ".".join(in_msa.split(os.sep)[-1].split(".")[:-1])
+    graph_name = in_msa.split(os.sep)[-1] + ".gfa"
+    graph_loc = os.path.join(out_directory, graph_name)
     graph.write_gfa(gfa_path=graph_loc)
 
 
@@ -462,13 +468,15 @@ def process_inputs(args, subcommand):
             sys.exit(1)
 
         if subcommand in {"build_index", "build_gfa"}:
-            endings = {"fasta", "fa", "gz"}
+            endings = {"fasta", "fa", "gz", "fas", "fna"}
         else:  # then the third subcommand is to align to graphs
             endings = {"gfa"}
 
         for f in os.listdir(args.in_dir):
             if f.split(".")[-1] in endings:
                 input_files.append(os.path.join(args.in_dir, f))
+            else:
+                logging.warning(f"the file {f} has an unrecognized extension, allowed are [fasta, fa, gz, fas, fna]")
 
     input_files.sort()
     return input_files
@@ -529,7 +537,8 @@ def _main(sys_argv, args, msa_name=None):
 
             logging.info(f"Indexing {len(sequences)} sequences from {msa} and using {args.seeding_alg} seeding method")
 
-            tmp = ".".join(msa.split(os.sep)[-1].split(".")[:-1])
+            tmp = msa.split(os.sep)[-1] + ".gfa"
+            # tmp = ".".join(msa.split(os.sep)[-1].split(".")[:-1])
             files_index[tmp] = idx  # dict of file names without extension and pos
             # indexing these sequences
             index_sequences(seed_index, sequences, idx, k=args.k_mer_size,
@@ -713,7 +722,8 @@ def _main(sys_argv, args, msa_name=None):
         for f in graph_files:
             logging.info(f"Loading graph {f}")
             graph = Graph(gfa_file=f)
-            f_name = ".".join(f.split(os.sep)[-1].split(".")[:-1])
+            f_name = f.split(os.sep)[-1]
+            # f_name = ".".join(f.split(os.sep)[-1].split(".")[:-1])
             idx = index["files_index"][f_name]
             graphs[idx] = graph
             # graphs.append(graph)

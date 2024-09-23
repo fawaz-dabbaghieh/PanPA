@@ -30,6 +30,12 @@ if CURRENT_PYTHON < REQUIRED_PYTHON:
 with open("README.md", "r") as readme:
     long_description = readme.read()
 
+reqs = []
+with open("requirements.txt", "r") as infile:
+    for l in infile:
+        if not l.startswith("#"):
+            reqs.append(l.strip())
+
 setup(
     name="PanPA",
     version=__version__,
@@ -49,7 +55,7 @@ setup(
         "Intended Audience :: Science/Research",
         "Topic :: Scientific/Engineering :: Bioinformatics",
     ],
-    setup_requires=["Cython==0.29.21"],
+    setup_requires=reqs,
     tests_require=['pytest'],
     include_package_data=True,
     python_requires=">=3.6",

@@ -3,3 +3,5 @@ name: PanPA
 dependencies:
   - python>3.5,<=3.8
   - cython=0.29.21
+  - pip:
+    - setuptools~=45.2.0

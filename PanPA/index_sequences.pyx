@@ -1,7 +1,6 @@
 # distutils: language=c++
 
 from collections import namedtuple, deque
-from PanPA.reverse_complement_fast import reverse_complement
 from PanPA.translate_read import translate
 # from libcpp.deque cimport deque
 
@@ -143,7 +142,6 @@ def index_sequences(seed_index, sequences, graph_id, k, w, seeding_alg):
     # but my functions are generators, so I need to have them in a loop
     # so now both functions take the same arguments, and I can put them in the seeding_funct variable, so I only
     # need to ask the questions whether to use k-mers or wk-minimizers once, and then I can use seeding_funct()
-
     if seeding_alg == "k_mers":
         seeding_funct = extract_kmers
     else:
