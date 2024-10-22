@@ -138,9 +138,9 @@ def align_to_graph(seqs_dict, graphs, graph_files, sub_matrix, gap_score, fs_sco
                             queue.put(a)
                         else:  # it's a DNA and could be reversed
                             if frame == 0:
-                                queue.put(a + b"\tDNA:Z:forward")
+                                queue.put(a + b"\tst:Z:forward")
                             else:
-                                queue.put(a + b"\tDNA:Z:reverse")
+                                queue.put(a + b"\tst:Z:reverse")
                     # if not reading_frame:
                     #     queue.put(a)
                     # else:
