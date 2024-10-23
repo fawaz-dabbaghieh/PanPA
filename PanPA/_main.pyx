@@ -110,7 +110,7 @@ def align_to_graph(seqs_dict, graphs, graph_files, sub_matrix, gap_score, fs_sco
                 # keeping only the seeds up to the limit
                 matches = matches[0:seed_limit]
 
-            print(f"The matches are {matches}")
+            # print(f"The matches are {matches}")
 
             if matches:
                 for i in matches:
@@ -119,7 +119,7 @@ def align_to_graph(seqs_dict, graphs, graph_files, sub_matrix, gap_score, fs_sco
                         continue
 
                     graph = graphs[i]
-                    print(f"aligning to graph {graph.name}")
+                    #print(f"aligning to graph {graph.name}")
                     # print(f"going to align {seq_name} to {graph.name}")
                     if dna:
                         alignments = align_to_graph_sw_fsa(graph, seq, seq_name, print_dp, sub_matrix,
