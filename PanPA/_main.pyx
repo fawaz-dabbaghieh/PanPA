@@ -138,9 +138,13 @@ def align_to_graph(seqs_dict, graphs, graph_files, sub_matrix, gap_score, fs_sco
                             queue.put(a)
                         else:  # it's a DNA and could be reversed
                             if frame == 0:
-                                queue.put(a + b"\tst:Z:forward")
+                                queue.put(a)
+                                # queue.put(a + b"\tst:Z:forward")
                             else:
-                                queue.put(a + b"\tst:Z:reverse")
+                                # todo hacky and needs fixing later
+                                a = a.replace(b"\t+\t", b"\t-\t")
+                                queue.put(a)
+                                # queue.put(a + b"\tst:Z:reverse")
                     # if not reading_frame:
                     #     queue.put(a)
                     # else:
@@ -317,11 +321,14 @@ def call_align_single(in_graph, seqs_dict, is_dna, sub_matrix, gap_score, fs_sco
                 else:  # it's a DNA and could be reversed
                     if frame == 0:
                         # print(f"trying to add {a} to the queue")
-                        queue.put(a + b"\tDNA:Z:forward")
+                        queue.put(a)
+                        #queue.put(a + b"\tDNA:Z:forward")
                         # print(f"added {a} to the queue")
                     else:
                         # print(f"trying to add {a} to the queue")
-                        queue.put(a + b"\tRF:Z:reverse")
+                        a = a.replace(b"\t+\t", b"\t-\t")
+                        queue.put(a)
+                        # queue.put(a + b"\tRF:Z:reverse")
                         # print(f"added {a} to the queue")
 
     queue.put(b'0')
