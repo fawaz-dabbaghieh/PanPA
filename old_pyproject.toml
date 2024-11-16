@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools<=75.1.0", "Cython==0.29.21"]
+build-backend = "setuptools.build_meta"
+
+
+[project]
+name = "PanPA"
+version = "2.1.2"
+authors = [
+    {name = "Fawaz Dabbaghie"}
+]
+maintainers = [
+    {name = "Fawaz Dabbaghie", email = "fawaz.dabbaghieh@gmail.com"}
+]
+description = "Toolkit for panproteome construction and alignments"
+readme = 'docs/README.rst'
+requires-python = ">=3.6,<=3.8"
+license = {text = "MIT"}
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Environment :: Console",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering :: Bioinformatics"
+]
+keywords = ["bioinformatics", "genomics", "pangenome", "panproteome", "toolkit"]
+
+
+[project.urls]
+"Homepage" = "https://github.com/fawaz-dabbaghieh/PanPA/"
+"Issues" = "https://github.com/fawaz-dabbaghieh/PanPA/issues"
+
+[project.scripts]
+PanPA = "PanPA.main:main"
