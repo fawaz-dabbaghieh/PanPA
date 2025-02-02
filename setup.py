@@ -20,10 +20,11 @@ The idea is that I use extensions and have a check whether I am requiring cython
 '''
 
 CURRENT_PYTHON = sys.version_info[:2]
-REQUIRED_PYTHON = (3, 6)
+REQUIRED_PYTHON_LOWER = (3, 6)
+REQUIRED_PYTHON_UPPER = (3, 8)
 
-if CURRENT_PYTHON < REQUIRED_PYTHON:
-    sys.stderr.write("PanPA requires Python 3.6 or higher and "
+if CURRENT_PYTHON < REQUIRED_PYTHON_LOWER or CURRENT_PYTHON > REQUIRED_PYTHON_UPPER:
+    sys.stderr.write("PanPA requires Python betwee 3.6 and 3.8 "
                      "you current verions is {}".format(CURRENT_PYTHON))
     sys.exit(1)
 
@@ -61,9 +62,9 @@ setup(
     python_requires=">=3.6",
     packages=find_packages(),
     install_requires=[],
-    # ext_modules=cythonize("PanPA/*pyx", compiler_directives={"boundscheck": False, "cdivision": True,
-    #                                            "nonecheck": False, "initializedcheck": False,
-    #                                            "language_level": "3"}),
+    ext_modules=cythonize("PanPA/*pyx", compiler_directives={"boundscheck": False, "cdivision": True,
+                                               "nonecheck": False, "initializedcheck": False,
+                                               "language_level": "3"}),
     entry_points={
         "console_scripts": ["PanPA = PanPA.main:main"],
     },

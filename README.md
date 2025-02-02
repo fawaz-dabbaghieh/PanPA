@@ -23,7 +23,7 @@ PanPA takes as input any number of MSAs in FASTA format, where each MSA represen
 In the following sections, installation will be explained and how to use each subcommand
 
 ## Installation
-PanPA is written in Cython and requires Python 3.6 or higher, and requires Cython.
+PanPA is written in Cython and requires Python between 3.6 and 3.8 (will be fixed later to include higher Python, but some bugs came up with newer versions when converting pyx files), and requires `Cython==0.29.21` and `setuptools~=75.1.0`.
 
 You can install Cython through pip with and has been tested with this version of Cython `pip install Cython==0.29.21`
 
